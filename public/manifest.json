@@ -1,0 +1,16 @@
+{
+  "name": "JS OrçaFácil - Oficinas & Gestão Ágil",
+  "short_name": "JS OrçaFácil",
+  "description": "Sistema profissional mobile-first de pátio em tempo real, orçamentos no WhatsApp e alertas de retorno para oficinas mecânicas.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080d14",
+  "theme_color": "#080d14",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

@@ -6,6 +6,7 @@ export interface Oficina {
   id: string;
   nome: string;
   whatsapp: string;
+  email?: string;
   created_at?: string;
 }
 

@@ -1,15 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const jakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-sans",
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
-  title: "OficinaOS | Gestão Ágil e Orçamentos Rápidos",
-  description: "Sistema mobile-first para oficinas mecânicas: pátio em tempo real, aprovação rápida no WhatsApp e alertas de retorno em 6 meses.",
+  title: "JS OrçaFácil | Gestão Ágil para Oficinas Mecânicas",
+  description: "Sistema profissional para oficinas mecânicas e centros automotivos: pátio em tempo real, orçamentos no WhatsApp e alertas de revisão.",
   manifest: "/manifest.json",
   icons: {
     icon: "/favicon.ico",
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#020617",
+  themeColor: "#080d14",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -30,8 +31,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className={`${inter.variable} dark h-full bg-slate-950 text-slate-100`}>
-      <body className="min-h-full flex flex-col font-sans antialiased bg-slate-950 text-slate-100">
+    <html lang="pt-BR" className={`${jakartaSans.variable} dark h-full bg-[#080d14] text-slate-100`}>
+      <body className="min-h-full flex flex-col font-sans antialiased bg-[#080d14] text-slate-100 selection:bg-emerald-500 selection:text-[#080d14]">
         {children}
       </body>
     </html>

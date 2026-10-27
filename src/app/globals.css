@@ -1,43 +1,58 @@
 @import "tailwindcss";
 
 :root {
-  --background: #020617;
-  --foreground: #f8fafc;
+  --background: #080d14;
+  --foreground: #f1f5f9;
+  --surface: #0e1724;
+  --card: #111d2c;
+  --card-hover: #142436;
+  --border: #1c2e42;
+  --border-light: #253d58;
+  --accent-green: #22c55e;
+  --accent-green-hover: #16a34a;
+  --accent-green-glow: rgba(34, 197, 94, 0.25);
+  --text-muted: #8b9eb0;
 }
 
 body {
-  background-color: #020617;
-  color: #f8fafc;
+  background-color: #080d14;
+  color: #f1f5f9;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-/* Custom scrollbar for mobile feel */
+/* Custom scrollbar matching PitTrack dark navy palette */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #080d14;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #1b2e42;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #27435f;
 }
 
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);
+    box-shadow: 0 0 15px rgba(34, 197, 94, 0.2);
   }
   50% {
-    box-shadow: 0 0 25px rgba(16, 185, 129, 0.5);
+    box-shadow: 0 0 25px rgba(34, 197, 94, 0.45);
   }
 }
 
-.glow-emerald {
+.glow-green {
   animation: pulseGlow 2.5s infinite ease-in-out;
+}
+
+/* Tabular numbers for clean prices alignment */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }

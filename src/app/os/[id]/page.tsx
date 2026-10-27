@@ -2,39 +2,37 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import confetti from 'canvas-confetti';
 import { 
   Wrench, 
-  Car, 
   CheckCircle2, 
   ShieldCheck, 
-  Clock, 
-  Phone, 
   MessageCircle, 
-  ChevronRight, 
   Package, 
   Gauge, 
   Calendar, 
   Camera, 
-  FileText, 
-  ExternalLink,
-  Sparkles,
-  Check,
-  AlertCircle
+  Sparkles, 
+  Check, 
+  AlertCircle,
+  User,
+  Car,
+  X
 } from 'lucide-react';
 import { OrdemServico, ItemOS, Oficina } from '@/types/database';
 import { fetchOrdemServicoById, aprovarOrçamento, formatWhatsAppNumber } from '@/lib/osService';
+import { useIsHydrated } from '@/lib/authService';
+import PitTrackLogo from '@/components/PitTrackLogo';
 
 export default function OSClientePublicaPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center animate-spin mb-4">
+        <div className="min-h-screen bg-[#080d14] flex flex-col items-center justify-center p-4 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center animate-spin mb-4 border border-emerald-500/20">
             <Wrench className="w-6 h-6" />
           </div>
-          <p className="text-sm font-bold text-slate-300">Carregando orçamento...</p>
+          <p className="text-sm font-bold text-slate-200">Carregando orçamento...</p>
         </div>
       }
     >
@@ -47,7 +45,7 @@ function OSClienteContent() {
   const params = useParams();
   const id = params?.id as string;
 
-  const [mounted, setMounted] = useState(false);
+  const isHydrated = useIsHydrated();
   const [os, setOs] = useState<OrdemServico | null>(null);
   const [itens, setItens] = useState<ItemOS[]>([]);
   const [oficina, setOficina] = useState<Oficina | null>(null);
@@ -57,7 +55,6 @@ function OSClienteContent() {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   useEffect(() => {
-    setMounted(true);
     if (!id) return;
 
     async function loadData() {
@@ -87,13 +84,12 @@ function OSClienteContent() {
         setIsApprovedSuccess(true);
         setOs((prev) => prev ? { ...prev, status: 'APROVADO', aprovado_em: new Date().toISOString() } : null);
 
-        // Disparar confetes visuais festivos
         try {
           confetti({
-            particleCount: 120,
-            spread: 70,
+            particleCount: 130,
+            spread: 75,
             origin: { y: 0.6 },
-            colors: ['#10b981', '#f59e0b', '#3b82f6', '#ffffff']
+            colors: ['#22c55e', '#38bdf8', '#a855f7', '#ffffff']
           });
         } catch {
           // ignore confetti if blocked
@@ -108,39 +104,44 @@ function OSClienteContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-center">
-        <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center animate-spin mb-4">
+      <div className="min-h-screen bg-[#080d14] flex flex-col items-center justify-center p-4 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center animate-spin mb-4 border border-emerald-500/20">
           <Wrench className="w-6 h-6" />
         </div>
-        <p className="text-sm font-bold text-slate-300">Carregando orçamento do seu veículo...</p>
-        <p className="text-xs text-slate-500 mt-1">Conexão segura com a oficina</p>
+        <p className="text-sm font-bold text-slate-200">Carregando orçamento do seu veículo...</p>
+        <p className="text-xs text-[#8b9eb0] mt-1">Conexão segura com a oficina</p>
       </div>
     );
   }
 
   if (!os) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center max-w-sm mx-auto">
-        <AlertCircle className="w-12 h-12 text-rose-500 mb-3" />
-        <h2 className="text-lg font-black text-white">Orçamento Não Encontrado</h2>
-        <p className="text-xs text-slate-400 mt-1 mb-6">
-          Não conseguimos localizar este orçamento. Verifique se o link está correto ou entre em contato com a oficina.
+      <div className="min-h-screen bg-[#080d14] flex flex-col items-center justify-center p-6 text-center max-w-sm mx-auto selection:bg-rose-500 selection:text-white">
+        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center mb-4 shadow-lg shadow-rose-500/10">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <h2 className="text-lg font-black text-white">Orçamento Não Localizado</h2>
+        <p className="text-xs text-[#8b9eb0] mt-2 mb-6 leading-relaxed">
+          Não conseguimos encontrar os detalhes deste orçamento. Certifique-se de que utilizou o link completo enviado pela oficina no seu WhatsApp.
         </p>
-        <Link
-          href="/"
-          className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-2.5 px-4 rounded-xl border border-slate-700"
-        >
-          Voltar para Início
-        </Link>
+        <div className="w-full bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 text-xs text-[#8b9eb0] space-y-1 text-left">
+          <div className="font-bold text-slate-200">Precisa de ajuda?</div>
+          <p className="text-[11px] text-[#5c7287]">
+            Responda à mensagem da sua oficina mecânica no WhatsApp solicitando o reenvio do link de aprovação.
+          </p>
+        </div>
+        <span className="text-[10px] text-[#5c7287] font-mono mt-8">
+          JS OrçaFácil • Plataforma Segura
+        </span>
       </div>
     );
   }
 
-  // Separar itens por tipo
-  const pecas = itens.filter((i) => i.tipo === 'PECA');
-  const maoDeObra = itens.filter((i) => i.tipo === 'MAO_DE_OBRA');
-  const totalPecas = pecas.reduce((s, i) => s + Number(i.valor), 0);
-  const totalMaoDeObra = maoDeObra.reduce((s, i) => s + Number(i.valor), 0);
+  // Separar itens por Serviços e Peças (exatamente como na imagem de referência)
+  const services = itens.filter((i) => i.tipo === 'MAO_DE_OBRA');
+  const parts = itens.filter((i) => i.tipo === 'PECA');
+  const serviceTotal = services.reduce((s, i) => s + Number(i.valor), 0);
+  const partsTotal = parts.reduce((s, i) => s + Number(i.valor), 0);
 
   const oficinaWhatsPhone = oficina?.whatsapp ? formatWhatsAppNumber(oficina.whatsapp) : '5511999998888';
   const duvidaWhatsLink = `https://wa.me/${oficinaWhatsPhone}?text=${encodeURIComponent(
@@ -148,30 +149,18 @@ function OSClienteContent() {
   )}`;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col pb-36 selection:bg-emerald-500 selection:text-slate-950">
-      {/* Top Header da Oficina Mecânica */}
-      <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-4 py-3 shadow-md">
+    <div className="min-h-screen bg-[#080d14] text-slate-100 flex flex-col pb-36 selection:bg-emerald-500 selection:text-slate-950">
+      
+      {/* Top Header com Logo PitTrack e Ação WhatsApp */}
+      <header className="sticky top-0 z-30 bg-[#080d14]/95 backdrop-blur-md border-b border-[#1c2e42] px-4 py-3 shadow-md">
         <div className="max-w-md mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950 font-black shadow-md shadow-amber-500/20">
-              <Wrench className="w-5 h-5 stroke-[2.5]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1">
-                <span className="font-extrabold text-sm text-white leading-tight">
-                  {oficina?.nome || 'Oficina Mecânica'}
-                </span>
-                <ShieldCheck className="w-4 h-4 text-emerald-400 inline" />
-              </div>
-              <span className="text-[10px] text-slate-400 block">Orçamento Digital Verificado</span>
-            </div>
-          </div>
+          <PitTrackLogo size="sm" />
 
           <a
             href={duvidaWhatsLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl transition-all"
+            className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-xl transition-all"
           >
             <MessageCircle className="w-3.5 h-3.5 fill-current" />
             <span>Falar c/ Oficina</span>
@@ -179,9 +168,10 @@ function OSClienteContent() {
         </div>
       </header>
 
-      {/* Main Container */}
+      {/* Main Container Mobile Fiel à Imagem de Referência */}
       <main className="max-w-md mx-auto w-full px-4 pt-4 flex-1 space-y-4">
-        {/* Banner de Status se já estiver Aprovado */}
+        
+        {/* Banner de Status Aprovado com Sucesso */}
         {isApprovedSuccess && (
           <div className="bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-transparent border border-emerald-500/50 rounded-2xl p-4 shadow-lg animate-in fade-in zoom-in-95 duration-300">
             <div className="flex items-start gap-3">
@@ -191,13 +181,13 @@ function OSClienteContent() {
               <div>
                 <h3 className="text-sm font-extrabold text-emerald-300 flex items-center gap-1.5">
                   <span>ORÇAMENTO APROVADO!</span>
-                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
                 </h3>
                 <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
-                  A oficina já recebeu a sua autorização em tempo real e a equipe mecânica iniciou o processo de separação de peças e execução do serviço.
+                  A oficina {oficina?.nome || 'mecânica'} já recebeu a sua autorização em tempo real e a equipe mecânica iniciou o processo de separação de peças e execução do serviço.
                 </p>
-                {mounted && os.aprovado_em && (
-                  <p className="text-[10px] text-emerald-400/80 font-mono mt-1.5">
+                {isHydrated && os.aprovado_em && (
+                  <p className="text-[10px] text-emerald-400 font-mono mt-1.5">
                     Data da aprovação: {new Date(os.aprovado_em).toLocaleString('pt-BR')}
                   </p>
                 )}
@@ -206,67 +196,68 @@ function OSClienteContent() {
           </div>
         )}
 
-        {/* Card do Veículo e Cliente */}
-        <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-4 shadow-lg space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
-                Código: {os.codigo_curto}
-              </span>
-              <h2 className="text-base font-black text-white mt-0.5">
+        {/* Card 1: Work Order Title + Status Pill + Customer + Vehicle (Fiel ao Mockup do Telefone) */}
+        <div className="bg-[#0e1724] rounded-2xl border border-[#1c2e42] p-4 shadow-xl space-y-3">
+          
+          {/* Título e Badge de Status */}
+          <div className="flex items-center justify-between border-b border-[#182738] pb-3">
+            <h2 className="text-lg font-black text-white tracking-tight">
+              Ordem de Serviço #{os.codigo_curto}
+            </h2>
+            <span
+              className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                isApprovedSuccess
+                  ? 'bg-emerald-500 text-slate-950 font-black border-emerald-400 shadow-md shadow-emerald-500/20'
+                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+              }`}
+            >
+              {isApprovedSuccess ? 'Aprovado' : 'Em Aberto'}
+            </span>
+          </div>
+
+          {/* Dados do Cliente (User Icon) */}
+          <div className="flex items-center gap-2 text-xs">
+            <User className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span className="font-semibold text-white">
+              {os.cliente_nome}
+            </span>
+          </div>
+
+          {/* Dados do Veículo (Car Icon) + Placa / VIN */}
+          <div className="flex items-center justify-between text-xs pt-0.5">
+            <div className="flex items-center gap-2 text-[#8b9eb0]">
+              <Car className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <span className="font-medium text-white truncate">
                 {os.veiculo_modelo}
-              </h2>
+              </span>
             </div>
-
-            {/* Placa Mercosul Estilizada */}
-            <div className="border border-slate-700 rounded-lg overflow-hidden shadow-sm bg-slate-950 text-center flex flex-col justify-center min-w-[80px]">
-              <div className="bg-blue-600 text-[8px] font-black tracking-widest text-white py-0.5 px-1 uppercase flex items-center justify-between">
-                <span>BRASIL</span>
-                <span className="w-1.5 h-1 rounded-xs bg-yellow-400 inline-block" />
-              </div>
-              <div className="font-mono font-black text-xs text-white px-2 py-0.5 tracking-wider">
-                {os.veiculo_placa}
-              </div>
-            </div>
+            <span className="font-mono font-bold text-xs bg-[#0b121b] border border-[#1c2e42] px-2 py-0.5 rounded text-white flex-shrink-0">
+              {os.veiculo_placa}
+            </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-            <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 flex items-center gap-2">
-              <Gauge className="w-4 h-4 text-amber-400 flex-shrink-0" />
-              <div>
-                <span className="text-[10px] text-slate-500 block">Odômetro / KM:</span>
-                <span className="font-mono font-bold text-slate-200">
-                  {os.km_atual ? `${os.km_atual.toLocaleString('pt-BR')} km` : 'Não inf.'}
-                </span>
-              </div>
+          {/* Odômetro e Data de Entrada */}
+          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[#182738] text-[11px] text-[#8b9eb0]">
+            <div className="flex items-center gap-1.5 font-mono">
+              <Gauge className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{os.km_atual ? `${os.km_atual.toLocaleString('pt-BR')} km` : 'KM não inf.'}</span>
             </div>
-
-            <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-              <div>
-                <span className="text-[10px] text-slate-500 block">Data de Entrada:</span>
-                <span className="font-mono font-bold text-slate-200">
-                  {mounted ? new Date(os.created_at).toLocaleDateString('pt-BR') : os.created_at.split('T')[0]}
-                </span>
-              </div>
+            <div className="flex items-center gap-1.5 font-mono justify-end">
+              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{isHydrated ? new Date(os.created_at).toLocaleDateString('pt-BR') : os.created_at.split('T')[0]}</span>
             </div>
-          </div>
-
-          <div className="text-xs text-slate-400 flex items-center justify-between border-t border-slate-800/80 pt-2 px-1">
-            <span>Proprietário: <strong className="text-slate-200">{os.cliente_nome}</strong></span>
-            <span className="text-[10px] text-slate-500 font-mono">Status: {os.status}</span>
           </div>
         </div>
 
-        {/* Fotos de Entrada (Check-in) */}
+        {/* Fotos de Entrada (Check-in) com Zoom */}
         {os.fotos_entrada && os.fotos_entrada.length > 0 && (
-          <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-4 shadow-lg space-y-3">
+          <div className="bg-[#0e1724] rounded-2xl border border-[#1c2e42] p-4 shadow-xl space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                <Camera className="w-4 h-4 text-amber-400" />
-                <span>Fotos de Check-in na Oficina</span>
+              <span className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1.5">
+                <Camera className="w-4 h-4 text-emerald-400" />
+                <span>Fotos do Check-in na Oficina</span>
               </span>
-              <span className="text-[10px] text-slate-500">
+              <span className="text-[10px] text-[#8b9eb0]">
                 {os.fotos_entrada.length} {os.fotos_entrada.length === 1 ? 'registro' : 'registros'}
               </span>
             </div>
@@ -276,16 +267,16 @@ function OSClienteContent() {
                 <div
                   key={idx}
                   onClick={() => setSelectedPhoto(foto)}
-                  className="aspect-video rounded-xl overflow-hidden border border-slate-800 bg-slate-950 cursor-pointer group relative"
+                  className="aspect-video rounded-xl overflow-hidden border border-[#1c2e42] bg-[#091018] cursor-pointer group relative"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={foto}
-                    alt={`Foto do veículo ${idx + 1}`}
+                    alt={`Foto ${idx + 1}`}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                   />
-                  <div className="absolute inset-0 bg-slate-950/20 group-hover:bg-transparent transition-colors" />
-                  <span className="absolute bottom-1 right-1 bg-slate-950/80 text-[9px] text-slate-300 px-1.5 py-0.5 rounded">
+                  <div className="absolute inset-0 bg-[#080d14]/20 group-hover:bg-transparent transition-colors" />
+                  <span className="absolute bottom-1 right-1 bg-[#080d14]/80 text-[9px] text-slate-300 px-1.5 py-0.5 rounded">
                     Toque para ampliar
                   </span>
                 </div>
@@ -294,97 +285,88 @@ function OSClienteContent() {
           </div>
         )}
 
-        {/* Tabela / Lista Discriminada de Itens */}
-        <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-4 shadow-lg space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-            <h3 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-              <FileText className="w-4 h-4" />
-              <span>Discriminação do Orçamento</span>
-            </h3>
-            <span className="text-[11px] text-slate-400">Transparência Total</span>
-          </div>
-
-          {/* Peças e Materiais */}
-          {pecas.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-amber-300/90 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20">
-                <span className="flex items-center gap-1.5">
-                  <Package className="w-3.5 h-3.5" />
-                  <span>Peças e Insumos ({pecas.length})</span>
-                </span>
-                <span className="font-mono">
-                  R$ {totalPecas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-
-              <div className="space-y-1.5 pl-1 pr-1">
-                {pecas.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-800/50">
-                    <span className="text-slate-300 leading-snug pr-2">{item.descricao}</span>
-                    <span className="font-mono font-semibold text-slate-200 flex-shrink-0">
-                      R$ {Number(item.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                ))}
-              </div>
+        {/* =========================================================================
+            CARD 2: SERVICES (Mão de Obra) - Fiel ao Mockup do iPhone
+        ========================================================================= */}
+        {services.length > 0 && (
+          <div className="bg-[#0e1724] rounded-2xl border border-[#1c2e42] p-4 shadow-xl space-y-3">
+            <div className="flex items-center gap-2 border-b border-[#182738] pb-2.5">
+              <Wrench className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-sm font-black text-white tracking-tight">Serviços & Mão de Obra</h3>
             </div>
-          )}
 
-          {/* Serviços e Mão de Obra */}
-          {maoDeObra.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-emerald-300/90 bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20">
-                <span className="flex items-center gap-1.5">
-                  <Wrench className="w-3.5 h-3.5" />
-                  <span>Mão de Obra e Serviços ({maoDeObra.length})</span>
-                </span>
-                <span className="font-mono">
-                  R$ {totalMaoDeObra.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
+            <div className="space-y-2.5">
+              {services.map((s) => (
+                <div key={s.id} className="flex items-center justify-between text-xs text-[#cbd5e1]">
+                  <span className="pr-2">{s.descricao}</span>
+                  <span className="font-mono font-bold text-white flex-shrink-0">
+                    R$ {Number(s.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              ))}
+            </div>
 
-              <div className="space-y-1.5 pl-1 pr-1">
-                {maoDeObra.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-800/50">
-                    <span className="text-slate-300 leading-snug pr-2">{item.descricao}</span>
-                    <span className="font-mono font-semibold text-slate-200 flex-shrink-0">
-                      R$ {Number(item.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Resumo Financeiro Final */}
-          <div className="bg-slate-950/90 rounded-xl p-3 border border-slate-800 space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Subtotal Peças:</span>
-              <span className="font-mono">R$ {totalPecas.toFixed(2)}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Subtotal Mão de Obra:</span>
-              <span className="font-mono">R$ {totalMaoDeObra.toFixed(2)}</span>
-            </div>
-            <div className="border-t border-slate-800 pt-2 flex items-baseline justify-between">
-              <div>
-                <span className="text-[10px] uppercase font-black tracking-wider text-amber-400 block">
-                  Valor Total Investido
-                </span>
-                <span className="text-[10px] text-slate-500">Garantia legal de 90 dias</span>
-              </div>
-              <span className="text-2xl font-black text-emerald-400 font-mono">
-                R$ {Number(os.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            {/* Subtotal Service Total */}
+            <div className="border-t border-[#182738] pt-2.5 flex items-center justify-between text-xs font-bold">
+              <span className="text-[#8b9eb0]">Total de Serviços</span>
+              <span className="text-white font-mono font-extrabold">
+                R$ {serviceTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </div>
+        )}
+
+        {/* =========================================================================
+            CARD 3: PARTS (Peças) - Fiel ao Mockup do iPhone
+        ========================================================================= */}
+        {parts.length > 0 && (
+          <div className="bg-[#0e1724] rounded-2xl border border-[#1c2e42] p-4 shadow-xl space-y-3">
+            <div className="flex items-center gap-2 border-b border-[#182738] pb-2.5">
+              <Package className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-sm font-black text-white tracking-tight">Peças & Componentes</h3>
+            </div>
+
+            <div className="space-y-2.5">
+              {parts.map((p) => (
+                <div key={p.id} className="flex items-center justify-between text-xs text-[#cbd5e1]">
+                  <span className="pr-2">{p.descricao}</span>
+                  <span className="font-mono font-bold text-white flex-shrink-0">
+                    R$ {Number(p.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Subtotal Parts Total */}
+            <div className="border-t border-[#182738] pt-2.5 flex items-center justify-between text-xs font-bold">
+              <span className="text-[#8b9eb0]">Total de Peças</span>
+              <span className="text-white font-mono font-extrabold">
+                R$ {partsTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            CARD 4: ESTIMATED TOTAL - Fiel ao Mockup do iPhone (Verde Neon)
+        ========================================================================= */}
+        <div className="bg-[#091018] rounded-2xl border border-[#1c2e42] p-4 shadow-xl flex items-center justify-between">
+          <div>
+            <span className="text-xs uppercase font-extrabold text-[#8b9eb0] tracking-wider block">
+              Valor Total do Orçamento
+            </span>
+            <span className="text-[10px] text-[#5c7287]">Garantia legal de 90 dias</span>
+          </div>
+          <span className="text-2xl font-black text-emerald-400 font-mono tracking-tight glow-green">
+            R$ {Number(os.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
         </div>
 
-        {/* Garantia e Segurança */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 flex items-center gap-2.5 text-xs text-slate-400">
+        {/* Selo de Garantia e Normas ABNT */}
+        <div className="bg-[#0e1724]/60 border border-[#1c2e42] rounded-xl p-3 flex items-center gap-2.5 text-xs text-[#8b9eb0]">
           <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0" />
           <span>
-            Peças com garantia de fábrica e serviços executados de acordo com as normas ABNT.
+            Peças originais com garantia de fábrica e serviços executados segundo normas ABNT.
           </span>
         </div>
       </main>
@@ -393,23 +375,25 @@ function OSClienteContent() {
       {selectedPhoto && (
         <div
           onClick={() => setSelectedPhoto(null)}
-          className="fixed inset-0 z-50 bg-slate-950/95 flex items-center justify-center p-4 backdrop-blur-md cursor-zoom-out"
+          className="fixed inset-0 z-50 bg-[#080d14]/95 flex items-center justify-center p-4 backdrop-blur-md cursor-zoom-out"
         >
-          <div className="relative max-w-lg w-full max-h-[85vh] rounded-2xl overflow-hidden border border-slate-700">
+          <div className="relative max-w-lg w-full max-h-[85vh] rounded-2xl overflow-hidden border border-[#1c2e42]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={selectedPhoto} alt="Foto Ampliada" className="w-full h-full object-contain" />
             <button
               onClick={() => setSelectedPhoto(null)}
-              className="absolute top-3 right-3 bg-slate-900/90 text-white p-2 rounded-full text-xs font-bold"
+              className="absolute top-3 right-3 bg-[#0e1724] text-white p-2 rounded-full text-xs font-bold border border-[#1c2e42]"
             >
-              ✕ Fechar
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
       )}
 
-      {/* Barra de Ação Fixa Inferior Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 px-4 py-3 shadow-2xl">
+      {/* =========================================================================
+          BARRA DE AÇÃO FIXA INFERIOR MOBILE - Botão Verde Vibrante (Update Status)
+      ========================================================================= */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#080d14]/95 backdrop-blur-xl border-t border-[#1c2e42] px-4 py-3 shadow-2xl">
         <div className="max-w-md mx-auto space-y-2">
           {isApprovedSuccess ? (
             <div className="w-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-black text-xs py-3.5 px-4 rounded-2xl text-center flex items-center justify-center gap-2 shadow-lg">
@@ -421,27 +405,27 @@ function OSClienteContent() {
               type="button"
               disabled={isApproving}
               onClick={handleAprovar}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500 hover:from-emerald-400 hover:to-emerald-300 active:scale-98 text-slate-950 font-black text-sm py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/30 transition-all uppercase tracking-wide glow-emerald"
+              className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 active:scale-98 text-slate-950 font-black text-sm py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/30 transition-all uppercase tracking-wide cursor-pointer"
             >
               {isApproving ? (
                 <span>Confirmando Aprovação...</span>
               ) : (
                 <>
-                  <span className="text-base">✅</span>
+                  <Check className="w-5 h-5 stroke-[3]" />
                   <span>APROVAR ORÇAMENTO AGORA</span>
                 </>
               )}
             </button>
           )}
 
-          {/* Botão Secundário: Tirar Dúvidas no WhatsApp */}
+          {/* Link Secundário: Dúvidas */}
           <a
             href={duvidaWhatsLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 py-1"
+            className="w-full flex items-center justify-center gap-1.5 text-xs text-[#8b9eb0] hover:text-white py-1 transition-colors"
           >
-            <MessageCircle className="w-3.5 h-3.5" />
+            <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
             <span>Dúvidas antes de aprovar? Fale com a oficina no WhatsApp</span>
           </a>
         </div>

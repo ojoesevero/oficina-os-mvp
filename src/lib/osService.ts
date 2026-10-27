@@ -1,9 +1,21 @@
 import { supabase, isSupabaseConfigured, DEMO_OFICINAS, DEMO_ORDENS_SERVICO, DEMO_ITENS_OS } from './supabase';
-import { Oficina, OrdemServico, ItemOS } from '@/types/database';
+import { Oficina, OrdemServico, ItemOS, StatusOS } from '@/types/database';
 
 const STORAGE_KEY_OS = 'oficina_os_items_data_v1';
 const STORAGE_KEY_ITEMS = 'oficina_os_itens_list_v1';
 const STORAGE_KEY_OFICINAS = 'oficina_os_oficinas_v1';
+
+// Gerador confiável de UUID v4 para compatibilidade total com tipos PostgreSQL UUID
+export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 // Helpers para sincronizar LocalStorage em modo demo
 function getLocalOficinas(): Oficina[] {
@@ -48,10 +60,12 @@ function getLocalItens(): ItemOS[] {
   }
 }
 
-function saveLocalOrdens(ordens: OrdemServico[]) {
+function saveLocalOrdens(ordens: OrdemServico[], updatedOS?: OrdemServico) {
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_OS, JSON.stringify(ordens));
-    window.dispatchEvent(new CustomEvent('os_status_changed', { detail: ordens }));
+    if (updatedOS) {
+      window.dispatchEvent(new CustomEvent('os_single_changed', { detail: updatedOS }));
+    }
   }
 }
 
@@ -127,9 +141,9 @@ export async function fetchOrdemServicoById(id: string): Promise<{ os: OrdemServ
     }
   }
 
-  // Fallback local
+  // Fallback local: busca estritamente pelo ID seguro para evitar enumeração de ordens
   const ordens = getLocalOrdens();
-  const os = ordens.find((item) => item.id === id || item.codigo_curto.toLowerCase() === id.toLowerCase());
+  const os = ordens.find((item) => item.id === id);
   if (!os) return null;
 
   const itens = getLocalItens().filter((item) => item.os_id === os.id);
@@ -196,7 +210,7 @@ export async function createOrdemServico(input: NovaOSInput): Promise<{ id: stri
   retorno.setDate(retorno.getDate() + 180);
   const data_proximo_retorno = retorno.toISOString().split('T')[0];
 
-  const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `os-${Date.now()}`;
+  const newId = generateUUID();
 
   const novaOSRecord: OrdemServico = {
     id: newId,
@@ -264,7 +278,7 @@ export async function createOrdemServico(input: NovaOSInput): Promise<{ id: stri
   // Salvar no estado local
   const ordens = getLocalOrdens();
   ordens.unshift(novaOSRecord);
-  saveLocalOrdens(ordens);
+  saveLocalOrdens(ordens, novaOSRecord);
 
   const itens = getLocalItens();
   itens.push(...novosItens);
@@ -273,23 +287,23 @@ export async function createOrdemServico(input: NovaOSInput): Promise<{ id: stri
   return { id: newId, codigo_curto };
 }
 
-// 6. Aprovar Orçamento (Ação pública do cliente)
-export async function aprovarOrçamento(id: string): Promise<boolean> {
-  const aprovadoEm = new Date().toISOString();
+// 6. Atualizar Status de uma Ordem de Serviço (Transição Rápida no Pátio)
+export async function updateOrdemServicoStatus(id: string, newStatus: StatusOS): Promise<boolean> {
+  const aprovadoEm = newStatus === 'APROVADO' ? new Date().toISOString() : undefined;
 
   if (isSupabaseConfigured) {
     try {
+      const payload: { status: StatusOS; aprovado_em?: string } = { status: newStatus };
+      if (aprovadoEm) payload.aprovado_em = aprovadoEm;
+
       const { error } = await supabase
         .from('ordens_servico')
-        .update({
-          status: 'APROVADO',
-          aprovado_em: aprovadoEm,
-        })
+        .update(payload)
         .eq('id', id);
 
       if (!error) return true;
     } catch (e) {
-      console.warn('Erro ao aprovar no Supabase, fallback local:', e);
+      console.warn('Erro ao atualizar status no Supabase:', e);
     }
   }
 
@@ -297,29 +311,51 @@ export async function aprovarOrçamento(id: string): Promise<boolean> {
   const ordens = getLocalOrdens();
   const index = ordens.findIndex((os) => os.id === id);
   if (index !== -1) {
-    ordens[index] = {
+    const updated = {
       ...ordens[index],
-      status: 'APROVADO',
-      aprovado_em: aprovadoEm,
+      status: newStatus,
+      aprovado_em: aprovadoEm || (newStatus === 'ORCAMENTO' ? null : ordens[index].aprovado_em),
     };
-    saveLocalOrdens(ordens);
+    ordens[index] = updated;
+    saveLocalOrdens(ordens, updated);
     return true;
   }
   return false;
 }
 
+// 7. Aprovar Orçamento (Ação pública do cliente)
+export async function aprovarOrçamento(id: string): Promise<boolean> {
+  return updateOrdemServicoStatus(id, 'APROVADO');
+}
+
 // 7. Configurar inscrição Realtime do Supabase + canal local de fallback
 export function subscribeToOrdensServico(onStatusChange: (updatedOS: Partial<OrdemServico>) => void) {
-  // Listener local para eventos em tempo real
+  // Listener local para eventos em tempo real direcionados ao registro exato
   const handleLocalEvent = (e: Event) => {
-    const custom = e as CustomEvent<OrdemServico[]>;
-    if (custom.detail && custom.detail.length > 0) {
-      onStatusChange(custom.detail[0]);
+    const custom = e as CustomEvent<OrdemServico>;
+    if (custom.detail) {
+      onStatusChange(custom.detail);
+    }
+  };
+
+  // Suporte a alterações originadas em outra aba (ex: cliente aprovou em aba separada)
+  const handleStorageEvent = (e: StorageEvent) => {
+    if (e.key === STORAGE_KEY_OS && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue) as OrdemServico[];
+        if (parsed.length > 0) {
+          // Dispara para o primeiro ou alterado
+          onStatusChange(parsed[0]);
+        }
+      } catch {
+        // ignore parse error
+      }
     }
   };
 
   if (typeof window !== 'undefined') {
-    window.addEventListener('os_status_changed', handleLocalEvent);
+    window.addEventListener('os_single_changed', handleLocalEvent);
+    window.addEventListener('storage', handleStorageEvent);
   }
 
   // Canal Supabase Realtime oficial
@@ -342,7 +378,8 @@ export function subscribeToOrdensServico(onStatusChange: (updatedOS: Partial<Ord
 
   return () => {
     if (typeof window !== 'undefined') {
-      window.removeEventListener('os_status_changed', handleLocalEvent);
+      window.removeEventListener('os_single_changed', handleLocalEvent);
+      window.removeEventListener('storage', handleStorageEvent);
     }
     supabase.removeChannel(channel);
   };

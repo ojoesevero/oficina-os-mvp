@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, 
@@ -10,17 +9,20 @@ import {
   Trash2, 
   Wrench, 
   Package, 
-  DollarSign, 
   CheckCircle2, 
   Loader2, 
   MessageCircle, 
-  Sparkles, 
   AlertCircle,
   UploadCloud,
-  X
+  X,
+  Building2,
+  Car,
+  User
 } from 'lucide-react';
-import { Oficina } from '@/types/database';
-import { fetchOficinas, uploadFotoOS, createOrdemServico, generateWhatsAppLinkParaCliente } from '@/lib/osService';
+import { uploadFotoOS, createOrdemServico, generateWhatsAppLinkParaCliente } from '@/lib/osService';
+import { useCurrentOficina, useIsHydrated } from '@/lib/authService';
+import { maskPlaca, unmaskPlaca, maskPhone, unmaskPhone, maskKM, unmaskKM } from '@/utils/masks';
+import PitTrackLogo from '@/components/PitTrackLogo';
 
 interface ItemForm {
   tipo: 'PECA' | 'MAO_DE_OBRA';
@@ -41,9 +43,9 @@ export default function NovaOSPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Estados
-  const [oficinas, setOficinas] = useState<Oficina[]>([]);
-  const [selectedOficinaId, setSelectedOficinaId] = useState<string>('');
+  // Estados Reativos de Autenticação e Oficina
+  const currentOficina = useCurrentOficina();
+  const isHydrated = useIsHydrated();
 
   // Dados do Veículo e Cliente
   const [veiculoPlaca, setVeiculoPlaca] = useState('');
@@ -72,16 +74,12 @@ export default function NovaOSPage() {
   const [createdOSData, setCreatedOSData] = useState<{ id: string; codigo_curto: string; whatsAppLink: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Verificar sessão da oficina sem setState cascading
   useEffect(() => {
-    async function loadOficinas() {
-      const ofs = await fetchOficinas();
-      setOficinas(ofs);
-      if (ofs.length > 0) {
-        setSelectedOficinaId(ofs[0].id);
-      }
+    if (isHydrated && !currentOficina) {
+      router.replace('/login?returnTo=/nova-os');
     }
-    loadOficinas();
-  }, []);
+  }, [isHydrated, currentOficina, router]);
 
   // Calcular valor total dinâmico
   const valorTotal = itens.reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
@@ -160,8 +158,8 @@ export default function NovaOSPage() {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!selectedOficinaId) {
-      setErrorMsg('Selecione uma oficina.');
+    if (!currentOficina) {
+      setErrorMsg('Sessão expirada. Faça login novamente.');
       return;
     }
     if (!veiculoPlaca.trim()) {
@@ -188,13 +186,17 @@ export default function NovaOSPage() {
     setIsSubmitting(true);
 
     try {
+      const cleanPlaca = unmaskPlaca(veiculoPlaca);
+      const cleanPhone = unmaskPhone(clienteWhatsapp);
+      const cleanKM = unmaskKM(kmAtual);
+
       const result = await createOrdemServico({
-        oficina_id: selectedOficinaId,
+        oficina_id: currentOficina.id,
         cliente_nome: clienteNome,
-        cliente_whatsapp: clienteWhatsapp,
-        veiculo_placa: veiculoPlaca,
+        cliente_whatsapp: cleanPhone,
+        veiculo_placa: cleanPlaca,
         veiculo_modelo: veiculoModelo,
-        km_atual: Number(kmAtual) || 0,
+        km_atual: cleanKM,
         fotos_entrada: fotos,
         itens: itens.map((it) => ({
           tipo: it.tipo,
@@ -203,18 +205,17 @@ export default function NovaOSPage() {
         })),
       });
 
-      const currentOficina = oficinas.find((o) => o.id === selectedOficinaId);
       const publicUrl = `${window.location.origin}/os/${result.id}`;
       const whatsAppLink = generateWhatsAppLinkParaCliente(
         {
           cliente_nome: clienteNome,
-          cliente_whatsapp: clienteWhatsapp,
+          cliente_whatsapp: cleanPhone,
           veiculo_modelo: veiculoModelo,
-          veiculo_placa: veiculoPlaca,
+          veiculo_placa: cleanPlaca,
           codigo_curto: result.codigo_curto,
           id: result.id,
         },
-        currentOficina?.nome || 'Oficina Mecânica',
+        currentOficina.nome,
         publicUrl
       );
 
@@ -224,7 +225,6 @@ export default function NovaOSPage() {
         whatsAppLink,
       });
 
-      // Abre imediatamente o WhatsApp em nova aba
       window.open(whatsAppLink, '_blank');
     } catch (err) {
       console.error(err);
@@ -234,23 +234,33 @@ export default function NovaOSPage() {
     }
   };
 
+  if (!isHydrated || !currentOficina) {
+    return (
+      <div className="min-h-screen bg-[#080d14] flex flex-col items-center justify-center p-4 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center animate-spin mb-4 border border-emerald-500/20">
+          <Loader2 className="w-6 h-6" />
+        </div>
+        <p className="text-sm font-bold text-slate-200">Carregando formulário de OS...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col pb-36">
-      {/* Top Header */}
-      <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-4 py-3">
+    <div className="min-h-screen bg-[#080d14] text-slate-100 flex flex-col pb-36 selection:bg-emerald-500 selection:text-slate-950">
+      
+      {/* Top Header com Botão de Voltar e Logo PitTrack */}
+      <header className="sticky top-0 z-30 bg-[#080d14]/95 backdrop-blur-md border-b border-[#1c2e42] px-4 py-3">
         <div className="max-w-md mx-auto flex items-center justify-between">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-slate-400 hover:text-white text-xs font-semibold py-1 px-2 rounded-lg hover:bg-slate-800 transition-colors"
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            className="flex items-center gap-1.5 text-[#8b9eb0] hover:text-white bg-[#0e1724] hover:bg-[#152336] active:scale-95 text-xs font-bold py-1.5 px-3 rounded-xl border border-[#1c2e42] transition-all cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
             <span>Voltar ao Pátio</span>
-          </Link>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-extrabold uppercase tracking-wider text-amber-400">
-              Nova Ordem de Serviço
-            </span>
-          </div>
+          </button>
+          
+          <PitTrackLogo size="sm" showSubtitle={false} />
         </div>
       </header>
 
@@ -264,92 +274,97 @@ export default function NovaOSPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Seletor de Oficina */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 shadow-sm">
-            <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1">
-              Oficina Responsável
-            </label>
-            <select
-              value={selectedOficinaId}
-              onChange={(e) => setSelectedOficinaId(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 text-xs font-semibold text-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500"
-            >
-              {oficinas.map((of) => (
-                <option key={of.id} value={of.id}>
-                  {of.nome}
-                </option>
-              ))}
-            </select>
+          
+          {/* Identificação da Oficina Autenticada */}
+          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold flex-shrink-0">
+                <Building2 className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-[#8b9eb0] block">
+                  Oficina Responsável
+                </span>
+                <span className="text-xs font-extrabold text-white truncate block">
+                  {currentOficina.nome}
+                </span>
+              </div>
+            </div>
+            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold px-2 py-0.5 rounded-lg flex-shrink-0">
+              Ativa
+            </span>
           </div>
 
           {/* Dados do Veículo */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center gap-2 border-b border-slate-800/80 pb-2">
-              <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                🚘 Dados do Veículo
+          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 border-b border-[#182738] pb-2">
+              <Car className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-black uppercase tracking-wider text-white">
+                Dados do Veículo
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
-              {/* Placa Mercosul */}
+              {/* Placa Mercosul com Máscara Automática */}
               <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1">
-                  Placa (Mercosul) *
+                <label className="text-[10px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1">
+                  Placa (Mercosul / Antiga) *
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: BRA2E19"
+                  placeholder="Ex: BRA2E19 ou ABC-1234"
                   maxLength={8}
                   value={veiculoPlaca}
-                  onChange={(e) => setVeiculoPlaca(e.target.value.toUpperCase())}
+                  onChange={(e) => setVeiculoPlaca(maskPlaca(e.target.value))}
                   required
-                  className="w-full bg-slate-950 border border-slate-700 uppercase font-mono font-bold text-sm text-amber-300 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500 tracking-wider placeholder:normal-case placeholder:font-normal placeholder:text-slate-600"
+                  className="w-full bg-[#080d14] border border-[#1c2e42] uppercase font-mono font-bold text-sm text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 tracking-wider placeholder:normal-case placeholder:font-normal placeholder:text-[#5c7287]"
                 />
               </div>
 
-              {/* KM Atual */}
+              {/* KM Atual com Máscara Automática */}
               <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1">
+                <label className="text-[10px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1">
                   KM Atual
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="numeric"
-                  placeholder="Ex: 48500"
+                  placeholder="Ex: 48.500"
                   value={kmAtual}
-                  onChange={(e) => setKmAtual(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 font-mono text-sm text-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder:text-slate-600"
+                  onChange={(e) => setKmAtual(maskKM(e.target.value))}
+                  className="w-full bg-[#080d14] border border-[#1c2e42] font-mono text-sm text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-[#5c7287]"
                 />
               </div>
             </div>
 
             {/* Modelo do Veículo */}
             <div>
-              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1">
+              <label className="text-[10px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1">
                 Modelo e Versão *
               </label>
               <input
                 type="text"
-                placeholder="Ex: Honda Civic EXL 2.0 2021"
+                placeholder="Ex: Toyota Corolla 2.0 ou Honda Civic EXL"
                 value={veiculoModelo}
                 onChange={(e) => setVeiculoModelo(e.target.value)}
                 required
-                className="w-full bg-slate-950 border border-slate-700 text-sm font-semibold text-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder:text-slate-600"
+                className="w-full bg-[#080d14] border border-[#1c2e42] text-sm font-semibold text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-[#5c7287]"
               />
             </div>
           </div>
 
           {/* Dados do Cliente */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center gap-2 border-b border-slate-800/80 pb-2">
-              <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                👤 Dados do Cliente (WhatsApp)
+          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 border-b border-[#182738] pb-2">
+              <User className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-black uppercase tracking-wider text-white">
+                Dados do Cliente (WhatsApp)
               </span>
             </div>
 
             <div className="space-y-2.5">
               <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1">
+                <label className="text-[10px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1">
                   Nome Completo *
                 </label>
                 <input
@@ -358,48 +373,50 @@ export default function NovaOSPage() {
                   value={clienteNome}
                   onChange={(e) => setClienteNome(e.target.value)}
                   required
-                  className="w-full bg-slate-950 border border-slate-700 text-sm font-semibold text-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-600"
+                  className="w-full bg-[#080d14] border border-[#1c2e42] text-sm font-semibold text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-[#5c7287]"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1">
-                  WhatsApp com DDD (somente números) *
+                <label className="text-[10px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1">
+                  WhatsApp com DDD (com máscara automática) *
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">
-                    +55
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#5c7287]">
+                    BR
                   </span>
                   <input
                     type="tel"
                     inputMode="numeric"
-                    placeholder="11991234567"
+                    placeholder="(11) 99123-4567"
+                    maxLength={15}
                     value={clienteWhatsapp}
-                    onChange={(e) => setClienteWhatsapp(e.target.value)}
+                    onChange={(e) => setClienteWhatsapp(maskPhone(e.target.value))}
                     required
-                    className="w-full bg-slate-950 border border-slate-700 text-sm font-mono font-semibold text-slate-200 rounded-xl pl-11 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-600"
+                    className="w-full bg-[#080d14] border border-[#1c2e42] text-sm font-mono font-semibold text-white rounded-xl pl-11 pr-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-[#5c7287]"
                   />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Upload de Fotos de Entrada (Supabase Storage 'fotos-os') */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                📸 Fotos de Entrada (Check-in)
+          {/* Upload de Fotos de Entrada */}
+          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-[#182738] pb-2">
+              <span className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1.5">
+                <Camera className="w-4 h-4 text-emerald-400" />
+                <span>Fotos de Check-in na Oficina</span>
               </span>
-              <span className="text-[10px] text-slate-500">
-                Bucket: <strong className="text-slate-400">fotos-os</strong>
+              <span className="text-[10px] text-[#5c7287]">
+                fotos-os
               </span>
             </div>
 
-            {/* Grid de Pré-visualização de Fotos */}
+            {/* Grid de Fotos */}
             {fotos.length > 0 && (
               <div className="grid grid-cols-3 gap-2 pt-1">
                 {fotos.map((url, idx) => (
-                  <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-slate-700 bg-slate-950 group">
+                  <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-[#1c2e42] bg-[#080d14] group">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={url} alt={`Entrada ${idx + 1}`} className="w-full h-full object-cover" />
                     <button
@@ -414,7 +431,7 @@ export default function NovaOSPage() {
               </div>
             )}
 
-            {/* Botão de Upload da Câmera / Arquivo */}
+            {/* Botão de Upload */}
             <input
               ref={fileInputRef}
               type="file"
@@ -429,38 +446,39 @@ export default function NovaOSPage() {
               type="button"
               disabled={isUploadingPhoto}
               onClick={() => fileInputRef.current?.click()}
-              className="w-full border-2 border-dashed border-slate-700 hover:border-amber-500/60 bg-slate-950/60 hover:bg-slate-950 transition-all rounded-xl py-3 px-4 flex items-center justify-center gap-2 text-xs font-bold text-slate-300 active:scale-98"
+              className="w-full border-2 border-dashed border-[#1c2e42] hover:border-emerald-500/60 bg-[#080d14] hover:bg-[#0c1521] transition-all rounded-xl py-3 px-4 flex items-center justify-center gap-2 text-xs font-bold text-slate-300 active:scale-98 cursor-pointer"
             >
               {isUploadingPhoto ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
                   <span>Enviando foto para o Supabase Storage...</span>
                 </>
               ) : (
                 <>
-                  <Camera className="w-4 h-4 text-amber-400" />
-                  <UploadCloud className="w-4 h-4 text-slate-400" />
+                  <Camera className="w-4 h-4 text-emerald-400" />
+                  <UploadCloud className="w-4 h-4 text-[#8b9eb0]" />
                   <span>Tirar Foto ou Carregar da Galeria</span>
                 </>
               )}
             </button>
           </div>
 
-          {/* Adição Dinâmica de Itens (Peças e Mão de Obra) */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-              <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                📋 Peças e Mão de Obra
+          {/* Adição Dinâmica de Itens (Services e Parts) */}
+          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-[#182738] pb-2">
+              <span className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1.5">
+                <Wrench className="w-4 h-4 text-emerald-400" />
+                <span>Peças & Serviços</span>
               </span>
               <span className="text-xs font-extrabold text-emerald-400 font-mono">
                 {itens.length} {itens.length === 1 ? 'item' : 'itens'}
               </span>
             </div>
 
-            {/* Sugestões Rápidas de 1 Clique */}
+            {/* Sugestões Rápidas */}
             <div>
-              <span className="text-[10px] uppercase font-bold text-slate-500 mb-1.5 block">
-                Sugestões Rápidas de Oficina:
+              <span className="text-[10px] uppercase font-bold text-[#5c7287] mb-1.5 block">
+                Atalhos Rápidos:
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {SUGESTOES_RAPIDAS.map((sug, i) => (
@@ -468,7 +486,7 @@ export default function NovaOSPage() {
                     key={i}
                     type="button"
                     onClick={() => handleAddSugestao(sug)}
-                    className="text-[10px] bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 px-2 py-1 rounded-lg flex items-center gap-1 active:scale-95 transition-all"
+                    className="text-[10px] bg-[#080d14] border border-[#1c2e42] hover:border-emerald-500/50 text-[#8b9eb0] hover:text-white px-2 py-1 rounded-lg flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
                   >
                     <span>+</span>
                     <span>{sug.descricao}</span>
@@ -478,29 +496,28 @@ export default function NovaOSPage() {
               </div>
             </div>
 
-            {/* Inputs para adicionar novo item */}
-            <div className="bg-slate-950/80 border border-slate-800 p-3 rounded-xl space-y-2.5">
-              {/* Seletor Tipo: Peça ou Mão de Obra */}
-              <div className="grid grid-cols-2 gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800">
+            {/* Formulário de Adição de Item */}
+            <div className="bg-[#080d14] border border-[#1c2e42] p-3 rounded-xl space-y-2.5">
+              <div className="grid grid-cols-2 gap-1.5 bg-[#0e1724] p-1 rounded-xl border border-[#1c2e42]">
                 <button
                   type="button"
                   onClick={() => setNovoTipo('PECA')}
-                  className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     novoTipo === 'PECA'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                      : 'text-[#8b9eb0] hover:text-white'
                   }`}
                 >
                   <Package className="w-3.5 h-3.5" />
-                  <span>Peça / Material</span>
+                  <span>Peça</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setNovoTipo('MAO_DE_OBRA')}
-                  className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     novoTipo === 'MAO_DE_OBRA'
                       ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200'
+                      : 'text-[#8b9eb0] hover:text-white'
                   }`}
                 >
                   <Wrench className="w-3.5 h-3.5" />
@@ -508,74 +525,55 @@ export default function NovaOSPage() {
                 </button>
               </div>
 
-              {/* Descrição e Valor */}
-              <div className="space-y-2">
+              <div className="grid grid-cols-3 gap-2">
                 <input
                   type="text"
-                  placeholder="Descrição do item ou serviço..."
+                  placeholder="Descrição do item..."
                   value={novaDescricao}
                   onChange={(e) => setNovaDescricao(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  className="col-span-2 bg-[#0e1724] border border-[#1c2e42] text-xs text-white rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500 placeholder:text-[#5c7287]"
                 />
-
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">
-                      R$
-                    </span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      value={novoValor}
-                      onChange={(e) => setNovoValor(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 text-xs font-mono font-bold text-emerald-400 rounded-xl pl-9 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleAddItem()}
-                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl flex items-center gap-1 active:scale-95 transition-all shadow-md shadow-amber-500/20"
-                  >
-                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                    <span>Adicionar</span>
-                  </button>
-                </div>
+                <input
+                  type="number"
+                  placeholder="R$ Valor"
+                  value={novoValor}
+                  onChange={(e) => setNovoValor(e.target.value)}
+                  className="bg-[#0e1724] border border-[#1c2e42] text-xs font-mono font-bold text-white rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500 placeholder:text-[#5c7287]"
+                />
               </div>
+
+              <button
+                type="button"
+                onClick={() => handleAddItem()}
+                className="w-full bg-[#122030] hover:bg-[#16273b] text-emerald-400 font-bold text-xs py-2 rounded-xl border border-[#1e344d] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>Adicionar ao Orçamento</span>
+              </button>
             </div>
 
-            {/* Lista dos Itens Adicionados */}
-            <div className="space-y-2 pt-1">
-              {itens.map((item, idx) => (
+            {/* Lista dos Itens Já Adicionados */}
+            <div className="space-y-1.5 pt-1">
+              {itens.map((it, idx) => (
                 <div
                   key={idx}
-                  className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5 flex items-center justify-between gap-2"
+                  className="bg-[#080d14] border border-[#1c2e42] p-2.5 rounded-xl flex items-center justify-between text-xs"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded tracking-wider flex-shrink-0 ${
-                        item.tipo === 'PECA'
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      }`}
-                    >
-                      {item.tipo === 'PECA' ? 'Peça' : 'Mão de Obra'}
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex-shrink-0">
+                      {it.tipo === 'PECA' ? 'Peça' : 'Serviço'}
                     </span>
-                    <span className="text-xs text-slate-200 font-medium truncate">
-                      {item.descricao}
-                    </span>
+                    <span className="text-slate-200 truncate">{it.descricao}</span>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-xs font-mono font-bold text-emerald-400">
-                      R$ {Number(item.valor).toFixed(2)}
+                  <div className="flex items-center gap-2 flex-shrink-0 font-mono">
+                    <span className="font-bold text-white">
+                      R$ {Number(it.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(idx)}
-                      className="text-slate-500 hover:text-rose-400 p-1 transition-colors"
+                      className="text-rose-400/80 hover:text-rose-300 p-1 rounded-lg"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -583,92 +581,98 @@ export default function NovaOSPage() {
                 </div>
               ))}
             </div>
-          </div>
-        </form>
-      </main>
 
-      {/* Modal / Alerta de Sucesso após Gravar */}
-      {createdOSData && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-emerald-500/50 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
-              <CheckCircle2 className="w-9 h-9 stroke-[2.5]" />
-            </div>
-
-            <div>
-              <h3 className="text-lg font-black text-white">OS Gravada com Sucesso!</h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Código gerado: <strong className="text-amber-400 font-mono text-sm">{createdOSData.codigo_curto}</strong>
-              </p>
-            </div>
-
-            <p className="text-xs text-slate-300 bg-slate-950/80 p-3 rounded-xl border border-slate-800 leading-relaxed">
-              A janela do WhatsApp foi aberta com a mensagem e o link público prontos para envio.
-            </p>
-
-            <div className="space-y-2 pt-2">
-              <a
-                href={createdOSData.whatsAppLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-xs py-3 rounded-xl shadow-lg shadow-emerald-500/25 transition-all uppercase tracking-wide"
-              >
-                <MessageCircle className="w-4 h-4 fill-current" />
-                <span>Reabrir WhatsApp</span>
-              </a>
-
-              <Link
-                href={`/os/${createdOSData.id}`}
-                className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs py-2.5 rounded-xl border border-slate-700 transition-all"
-              >
-                <span>Ver Link do Cliente</span>
-              </Link>
-
-              <button
-                onClick={() => router.push('/')}
-                className="w-full text-slate-400 hover:text-white text-xs py-2"
-              >
-                Voltar para o Pátio
-              </button>
+            {/* Totalizador Estilo PitTrack */}
+            <div className="bg-[#091018] rounded-xl p-3 border border-[#1c2e42] flex items-center justify-between">
+              <span className="text-xs uppercase font-extrabold text-[#8b9eb0] tracking-wider">
+                Valor Total Estimado
+              </span>
+              <span className="text-xl font-black text-emerald-400 font-mono">
+                R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Barra de Ação Fixa Inferior Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 px-4 py-3 shadow-2xl">
-        <div className="max-w-md mx-auto space-y-2">
-          {/* Soma Automática do Valor Total */}
-          <div className="flex items-center justify-between text-xs px-1">
-            <span className="text-slate-400 uppercase font-bold tracking-wider text-[11px]">
-              Valor Total do Orçamento:
-            </span>
-            <span className="text-xl font-black text-emerald-400 font-mono">
-              R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-
-          {/* Botão de Destaque 'Salvar e Enviar p/ Cliente' */}
+          {/* Botão de Envio (Vibrante Verde Neon) */}
           <button
-            type="button"
-            disabled={isSubmitting || isUploadingPhoto}
-            onClick={handleSubmit}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500 hover:from-emerald-400 hover:to-emerald-300 active:scale-98 disabled:opacity-50 text-slate-950 font-black text-sm py-3.5 px-4 rounded-2xl shadow-xl shadow-emerald-500/30 transition-all uppercase tracking-wide"
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 active:scale-98 disabled:opacity-50 text-slate-950 font-black text-sm py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/30 transition-all uppercase tracking-wide cursor-pointer"
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Salvando no Supabase...</span>
+                <span>Gerando Orçamento e Link...</span>
               </>
             ) : (
               <>
-                <MessageCircle className="w-5 h-5 fill-slate-950" />
+                <MessageCircle className="w-5 h-5 fill-current" />
                 <span>Salvar e Enviar p/ Cliente</span>
               </>
             )}
           </button>
-        </div>
-      </div>
+        </form>
+
+        {/* Modal de Sucesso Pós-Criação */}
+        {createdOSData && (
+          <div className="fixed inset-0 z-50 bg-[#080d14]/95 flex items-center justify-center p-4 backdrop-blur-md">
+            <div className="bg-[#0e1724] border border-[#1c2e42] rounded-3xl p-6 max-w-sm w-full space-y-4 text-center shadow-2xl">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 mx-auto flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-black text-white">Ordem de Serviço Criada!</h3>
+              <p className="text-xs text-[#8b9eb0]">
+                A OS <strong className="text-emerald-400 font-mono">{createdOSData.codigo_curto}</strong> foi gravada com sucesso.
+              </p>
+
+              <div className="space-y-2 pt-2">
+                <a
+                  href={createdOSData.whatsAppLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs py-3.5 rounded-xl shadow-lg shadow-emerald-500/25 transition-all uppercase tracking-wide cursor-pointer"
+                >
+                  <MessageCircle className="w-4 h-4 fill-current" />
+                  <span>Abrir / Enviar no WhatsApp</span>
+                </a>
+
+                <a
+                  href={`/os/${createdOSData.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 bg-[#122030] hover:bg-[#16273b] text-white font-bold text-xs py-2.5 rounded-xl border border-[#1e344d] transition-all cursor-pointer"
+                >
+                  <span>Visualizar Página do Cliente</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatedOSData(null);
+                    setVeiculoPlaca('');
+                    setVeiculoModelo('');
+                    setKmAtual('');
+                    setClienteNome('');
+                    setClienteWhatsapp('');
+                    setFotos([]);
+                  }}
+                  className="w-full text-emerald-400 hover:text-emerald-300 text-xs font-bold py-2 cursor-pointer transition-colors"
+                >
+                  + Cadastrar Outro Veículo
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => router.push('/')}
+                  className="w-full text-[#8b9eb0] hover:text-white text-xs py-1 transition-colors cursor-pointer"
+                >
+                  ← Voltar ao Pátio
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

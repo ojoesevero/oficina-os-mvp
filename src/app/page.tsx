@@ -2,77 +2,80 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   Wrench, 
   Car, 
   Clock, 
-  CheckCircle2, 
-  AlertTriangle, 
   Plus, 
   ExternalLink, 
   MessageCircle, 
-  Radio, 
   Calendar, 
   Search, 
-  ChevronDown,
-  Gauge,
-  Sparkles,
-  ArrowRight,
-  ShieldCheck,
-  RefreshCw,
-  Zap
+  Sparkles, 
+  LogOut, 
+  Bell, 
+  LayoutDashboard, 
+  Check, 
+  FileText,
+  User,
+  ChevronDown
 } from 'lucide-react';
-import { Oficina, OrdemServico, StatusOS } from '@/types/database';
+import { OrdemServico, StatusOS } from '@/types/database';
 import { 
-  fetchOficinas, 
   fetchOrdensServico, 
   subscribeToOrdensServico, 
   generateWhatsAppLinkParaCliente, 
   generateWhatsAppRevisaoLink,
-  aprovarOrçamento
+  updateOrdemServicoStatus
 } from '@/lib/osService';
+import { 
+  useCurrentOficina, 
+  useIsHydrated, 
+  logoutOficina 
+} from '@/lib/authService';
+import PitTrackLogo from '@/components/PitTrackLogo';
+
+type FilterTab = 'ALL' | 'ORCAMENTO' | 'EM_SERVICO' | 'APROVADO' | 'FINALIZADO' | 'ALERTAS';
 
 export default function DashboardPage() {
-  const [mounted, setMounted] = useState<boolean>(false);
-  const [oficinas, setOficinas] = useState<Oficina[]>([]);
-  const [selectedOficinaId, setSelectedOficinaId] = useState<string>('');
+  const router = useRouter();
+  const currentOficina = useCurrentOficina();
+  const isHydrated = useIsHydrated();
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
-  const [activeTab, setActiveTab] = useState<'patio' | 'alertas'>('patio');
+  const [activeTab, setActiveTab] = useState<FilterTab>('ALL');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [realtimeNotification, setRealtimeNotification] = useState<string | null>(null);
 
-  // Carregar oficinas iniciais e marcar como montado
+  // 1. Redirecionar para login caso não autenticado após hidratação
   useEffect(() => {
-    setMounted(true);
-    async function initData() {
-      setIsLoading(true);
-      const ofs = await fetchOficinas();
-      setOficinas(ofs);
-      if (ofs.length > 0) {
-        setSelectedOficinaId(ofs[0].id);
-      }
-      setIsLoading(false);
+    if (isHydrated && !currentOficina) {
+      router.replace('/login');
     }
-    initData();
-  }, []);
+  }, [isHydrated, currentOficina, router]);
 
-  // Carregar ordens da oficina selecionada
+  // 2. Carregar ordens estritamente da oficina autenticada
   useEffect(() => {
-    if (!selectedOficinaId) return;
+    if (!currentOficina?.id) return;
 
     let isMounted = true;
     async function loadOrdens() {
-      const data = await fetchOrdensServico(selectedOficinaId);
+      setIsLoading(true);
+      const data = await fetchOrdensServico(currentOficina!.id);
       if (isMounted) {
         setOrdens(data);
+        setIsLoading(false);
       }
     }
     loadOrdens();
 
-    // Inscrever no Realtime (Supabase + broadcast local)
+    // Inscrever no Realtime isolado para esta oficina
     const unsubscribe = subscribeToOrdensServico((updatedOS) => {
-      // Notificação visual no topo
+      if (updatedOS.oficina_id && updatedOS.oficina_id !== currentOficina.id) {
+        return;
+      }
+
       if (updatedOS.status === 'APROVADO') {
         setRealtimeNotification(`⚡ A OS ${updatedOS.codigo_curto || ''} foi APROVADA pelo cliente!`);
         setTimeout(() => setRealtimeNotification(null), 6000);
@@ -82,7 +85,7 @@ export default function DashboardPage() {
         const exists = prev.some((o) => o.id === updatedOS.id);
         if (exists) {
           return prev.map((o) => (o.id === updatedOS.id ? { ...o, ...updatedOS } as OrdemServico : o));
-        } else if (updatedOS.oficina_id === selectedOficinaId) {
+        } else if (!updatedOS.oficina_id || updatedOS.oficina_id === currentOficina.id) {
           return [updatedOS as OrdemServico, ...prev];
         }
         return prev;
@@ -93,28 +96,25 @@ export default function DashboardPage() {
       isMounted = false;
       unsubscribe();
     };
-  }, [selectedOficinaId]);
+  }, [currentOficina]);
 
-  const currentOficina = useMemo(() => {
-    return oficinas.find((o) => o.id === selectedOficinaId) || oficinas[0];
-  }, [oficinas, selectedOficinaId]);
+  const handleLogout = async () => {
+    if (confirm('Deseja realmente sair da oficina?')) {
+      await logoutOficina();
+      router.replace('/login');
+    }
+  };
 
-  // Filtragem de Pátio
-  const patioOrdens = useMemo(() => {
-    return ordens.filter((os) => {
-      // Exibir ordens ativas (Orçamento, Aprovado, Em Serviço)
-      const matchesSearch = 
-        os.veiculo_placa.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        os.veiculo_modelo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        os.cliente_nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        os.codigo_curto.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
-    });
-  }, [ordens, searchQuery]);
+  // Contagens para os filtros
+  const countAll = ordens.length;
+  const countOpen = ordens.filter((o) => o.status === 'ORCAMENTO').length;
+  const countInProgress = ordens.filter((o) => o.status === 'EM_SERVICO').length;
+  const countPartsOrdered = ordens.filter((o) => o.status === 'APROVADO').length;
+  const countCompleted = ordens.filter((o) => o.status === 'FINALIZADO').length;
 
-  // Alertas de Retorno (6 meses / vencidos ou a vencer em 15 dias)
+  // Alertas de Retorno (6 meses)
   const alertasRetorno = useMemo(() => {
-    if (!mounted) return [];
+    if (!isHydrated) return [];
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
@@ -122,11 +122,7 @@ export default function DashboardPage() {
       if (!os.data_proximo_retorno) return false;
       const dataRet = new Date(os.data_proximo_retorno);
       dataRet.setHours(0, 0, 0, 0);
-
-      const diffTime = dataRet.getTime() - hoje.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      // Se já venceu (diffDays <= 0) ou se vence nos próximos 15 dias (diffDays <= 15)
+      const diffDays = Math.ceil((dataRet.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
       return diffDays <= 15;
     }).map((os) => {
       const hoje = new Date();
@@ -140,505 +136,849 @@ export default function DashboardPage() {
         isVencido: diffDays < 0,
       };
     }).sort((a, b) => a.diffDays - b.diffDays);
-  }, [ordens, mounted]);
+  }, [ordens, isHydrated]);
 
-  // Métricas rápidas
-  const totalPatio = ordens.filter((o) => o.status !== 'FINALIZADO' && o.status !== 'CANCELADO').length;
-  const totalAprovados = ordens.filter((o) => o.status === 'APROVADO').length;
-  const totalOrcamento = ordens.filter((o) => o.status === 'ORCAMENTO').length;
+  // Ordens filtradas
+  const filteredOrdens = useMemo(() => {
+    return ordens.filter((os) => {
+      // Filtro de texto
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = 
+        !q ||
+        os.veiculo_placa.toLowerCase().includes(q) ||
+        os.veiculo_modelo.toLowerCase().includes(q) ||
+        os.cliente_nome.toLowerCase().includes(q) ||
+        os.codigo_curto.toLowerCase().includes(q);
 
-  const handleSimularAprovacao = async (id: string, codigo: string) => {
-    await aprovarOrçamento(id);
-    setRealtimeNotification(`Simulação: OS ${codigo} marcada como APROVADO via Realtime!`);
-    setTimeout(() => setRealtimeNotification(null), 5000);
-  };
+      if (!matchesSearch) return false;
 
-  const getStatusBadge = (status: StatusOS) => {
-    switch (status) {
-      case 'ORCAMENTO':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
-            Orçamento Pendente
-          </span>
-        );
-      case 'APROVADO':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 glow-emerald">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            Aprovado pelo Cliente
-          </span>
-        );
-      case 'EM_SERVICO':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/30">
-            <Wrench className="w-3.5 h-3.5 text-blue-400" />
-            No Elevador / Serviço
-          </span>
-        );
-      case 'FINALIZADO':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
-            <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-            Entregue / Concluído
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-400">
-            {status}
-          </span>
-        );
+      // Filtro por Tab
+      if (activeTab === 'ALL') return true;
+      if (activeTab === 'ORCAMENTO') return os.status === 'ORCAMENTO';
+      if (activeTab === 'EM_SERVICO') return os.status === 'EM_SERVICO';
+      if (activeTab === 'APROVADO') return os.status === 'APROVADO';
+      if (activeTab === 'FINALIZADO') return os.status === 'FINALIZADO';
+      return true;
+    });
+  }, [ordens, searchQuery, activeTab]);
+
+  // Cálculos de Totais (Budget Totals)
+  const totalGeral = ordens.reduce((s, o) => s + (Number(o.valor_total) || 0), 0);
+  const totalMaoDeObraEst = totalGeral * 0.45;
+  const totalPecasEst = totalGeral * 0.50;
+  const totalOutrosEst = totalGeral * 0.05;
+
+  // Transição rápida de status no pátio com feedback imediato
+  const handleUpdateStatus = async (id: string, codigo: string, newStatus: StatusOS) => {
+    const ok = await updateOrdemServicoStatus(id, newStatus);
+    if (ok) {
+      setRealtimeNotification(`⚡ Status da OS ${codigo} alterado para "${newStatus}"!`);
+      setTimeout(() => setRealtimeNotification(null), 4000);
     }
   };
 
+  // Seletor Interativo de Status com Transição Rápida
+  const renderStatusBadge = (os: OrdemServico) => {
+    return (
+      <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+        <select
+          value={os.status}
+          onChange={(e) => handleUpdateStatus(os.id, os.codigo_curto, e.target.value as StatusOS)}
+          className={`appearance-none cursor-pointer text-xs font-bold px-2.5 py-1 pr-6 rounded-full border transition-all focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
+            os.status === 'ORCAMENTO'
+              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+              : os.status === 'APROVADO'
+              ? 'bg-purple-500/15 text-purple-400 border-purple-500/30 hover:bg-purple-500/25'
+              : os.status === 'EM_SERVICO'
+              ? 'bg-sky-500/15 text-sky-400 border-sky-500/30 hover:bg-sky-500/25'
+              : os.status === 'FINALIZADO'
+              ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+          }`}
+          title="Clique para transição rápida de status"
+        >
+          <option value="ORCAMENTO" className="bg-[#0e1724] text-emerald-400">
+            ● Orçamento (Aberto)
+          </option>
+          <option value="APROVADO" className="bg-[#0e1724] text-purple-400">
+            ● Aprovado (Aguardando Peças)
+          </option>
+          <option value="EM_SERVICO" className="bg-[#0e1724] text-sky-400">
+            ● Em Serviço (Na Oficina)
+          </option>
+          <option value="FINALIZADO" className="bg-[#0e1724] text-slate-300">
+            ● Finalizado (Pronto)
+          </option>
+          <option value="CANCELADO" className="bg-[#0e1724] text-rose-400">
+            ● Cancelado
+          </option>
+        </select>
+        <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+      </div>
+    );
+  };
+
+  if (!isHydrated || !currentOficina) {
+    return (
+      <div className="min-h-screen bg-[#080d14] flex flex-col items-center justify-center p-4 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center animate-spin mb-4 border border-emerald-500/20">
+          <Wrench className="w-6 h-6" />
+        </div>
+        <p className="text-sm font-bold text-slate-200">Carregando JS OrçaFácil...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col pb-24 selection:bg-emerald-500 selection:text-slate-950">
+    <div className="min-h-screen bg-[#080d14] text-slate-100 flex selection:bg-emerald-500 selection:text-[#080d14]">
+      
       {/* Toast Notificação Realtime */}
       {realtimeNotification && (
-        <div className="fixed top-4 left-4 right-4 z-50 max-w-md mx-auto bg-emerald-500 text-slate-950 px-4 py-3 rounded-xl shadow-2xl font-bold text-sm flex items-center justify-between animate-bounce">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 flex-shrink-0" />
-            <span>{realtimeNotification}</span>
-          </div>
-          <button 
-            onClick={() => setRealtimeNotification(null)}
-            className="text-xs bg-slate-950/20 px-2 py-1 rounded hover:bg-slate-950/30"
-          >
-            ✕
-          </button>
+        <div className="fixed top-4 right-4 z-50 max-w-sm bg-gradient-to-r from-emerald-600 to-emerald-500 text-slate-950 font-bold px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-top duration-300 border border-emerald-400">
+          <Sparkles className="w-5 h-5 flex-shrink-0 animate-bounce" />
+          <span className="text-xs">{realtimeNotification}</span>
         </div>
       )}
 
-      {/* Top Header Industrial */}
-      <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800/80 px-4 py-3">
-        <div className="max-w-md mx-auto flex items-center justify-between gap-3">
-          {/* Logo e Nome */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 via-amber-600 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-500/20 text-slate-950 font-black">
-              <Wrench className="w-5 h-5 stroke-[2.5]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h1 className="font-extrabold tracking-tight text-base text-white">OficinaOS</h1>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded border border-amber-500/30">
-                  DEMO
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
-                <span className="text-emerald-400 font-semibold">Supabase Realtime</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Botão Ação Rápida: Nova OS */}
-          <Link
-            href="/nova-os"
-            className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 active:scale-95 transition-all text-slate-950 font-bold text-xs px-3.5 py-2.5 rounded-xl shadow-lg shadow-emerald-500/25"
-          >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Nova OS</span>
+      {/* =========================================================================
+          1. DESKTOP SIDEBAR (Esquerda - Fiel ao Mockup do MacBook)
+      ========================================================================= */}
+      <aside className="hidden lg:flex w-64 flex-col bg-[#0b121b] border-r border-[#1c2e42] flex-shrink-0 p-5 justify-between">
+        <div className="space-y-6">
+          {/* Logo da Marca */}
+          <Link href="/" className="block">
+            <PitTrackLogo size="md" />
           </Link>
-        </div>
 
-        {/* Dropdown Seletor de Oficinas (Modo Demo) */}
-        <div className="max-w-md mx-auto mt-3">
-          <div className="relative">
-            <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1 block flex items-center justify-between">
-              <span>Oficina Ativa (Alternar Modo Demo)</span>
-              <span className="text-amber-400 font-medium lowercase">troca rápida</span>
-            </label>
-            <div className="relative">
-              <select
-                value={selectedOficinaId}
-                onChange={(e) => setSelectedOficinaId(e.target.value)}
-                className="w-full appearance-none bg-slate-950/80 border border-slate-700/80 hover:border-slate-600 text-slate-200 text-xs font-semibold rounded-xl px-3.5 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all cursor-pointer"
-              >
-                {oficinas.map((oficina) => (
-                  <option key={oficina.id} value={oficina.id} className="bg-slate-900 text-white py-1">
-                    🏢 {oficina.nome}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
-        </div>
-      </header>
+          {/* Menu de Navegação */}
+          <nav className="space-y-1 text-sm font-medium">
+            <button
+              onClick={() => setActiveTab('ALL')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
+                activeTab === 'ALL'
+                  ? 'bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20'
+                  : 'text-[#8b9eb0] hover:text-white hover:bg-[#111e2e]'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
+              <span>Painel Principal</span>
+            </button>
 
-      {/* Main Container */}
-      <main className="max-w-md mx-auto w-full px-4 pt-3 flex-1">
-        {/* Painel de Métricas Rápidas */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className="bg-slate-900/80 border border-slate-800 p-2.5 rounded-xl text-center">
-            <div className="text-[10px] uppercase font-bold text-slate-400">Pátio Total</div>
-            <div className="text-xl font-extrabold text-white mt-0.5">{totalPatio}</div>
-          </div>
-          <div className="bg-slate-900/80 border border-amber-500/20 p-2.5 rounded-xl text-center">
-            <div className="text-[10px] uppercase font-bold text-amber-400">Aguardando</div>
-            <div className="text-xl font-extrabold text-amber-400 mt-0.5">{totalOrcamento}</div>
-          </div>
-          <div className="bg-slate-900/80 border border-emerald-500/20 p-2.5 rounded-xl text-center">
-            <div className="text-[10px] uppercase font-bold text-emerald-400">Aprovados</div>
-            <div className="text-xl font-extrabold text-emerald-400 mt-0.5">{totalAprovados}</div>
-          </div>
-        </div>
-
-        {/* Duas Abas Principais */}
-        <div className="bg-slate-900 p-1 rounded-2xl border border-slate-800 flex gap-1 mb-4 shadow-inner">
-          <button
-            onClick={() => setActiveTab('patio')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-bold text-xs transition-all ${
-              activeTab === 'patio'
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-extrabold'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <Car className="w-4 h-4" />
-            <span>Pátio Agora ({patioOrdens.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('alertas')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-bold text-xs transition-all relative ${
-              activeTab === 'alertas'
-                ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 font-extrabold'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <AlertTriangle className="w-4 h-4 text-inherit" />
-            <span>Retorno 6M</span>
-            {alertasRetorno.length > 0 && (
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                activeTab === 'alertas' ? 'bg-slate-950 text-emerald-400' : 'bg-amber-500 text-slate-950'
-              }`}>
-                {alertasRetorno.length}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* CONTEÚDO DA ABA 1: PÁTIO AGORA */}
-        {activeTab === 'patio' && (
-          <div className="space-y-3">
-            {/* Campo de Busca Rápida */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Buscar por placa, modelo ou cliente..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 focus:border-amber-500/50 text-xs text-white rounded-xl pl-9.5 pr-4 py-2.5 focus:outline-none transition-all placeholder:text-slate-500"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs hover:text-slate-300"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {/* Listagem de Ordens de Serviço */}
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
-                <RefreshCw className="w-7 h-7 animate-spin text-amber-500" />
-                <p className="text-xs">Carregando ordens de serviço...</p>
+            <button
+              onClick={() => setActiveTab('ALL')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
+                activeTab !== 'ALERTAS'
+                  ? 'bg-[#122030] text-emerald-400 font-bold border border-[#1e344d]'
+                  : 'text-[#8b9eb0] hover:text-white hover:bg-[#111e2e]'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Wrench className="w-4 h-4 flex-shrink-0" />
+                <span>Ordens de Serviço</span>
               </div>
-            ) : patioOrdens.length === 0 ? (
-              <div className="bg-slate-900/50 border border-dashed border-slate-800 rounded-2xl p-8 text-center">
-                <Car className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-slate-300">Nenhuma OS encontrada</p>
-                <p className="text-xs text-slate-500 mt-1 mb-4">Cadastre a primeira OS rápida agora mesmo.</p>
+              <span className="text-[11px] bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-full">
+                {countAll}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('ALERTAS')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
+                activeTab === 'ALERTAS'
+                  ? 'bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20'
+                  : 'text-[#8b9eb0] hover:text-white hover:bg-[#111e2e]'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Calendar className="w-4 h-4 flex-shrink-0" />
+                <span>Alertas 6 Meses</span>
+              </div>
+              {alertasRetorno.length > 0 && (
+                <span className="text-[11px] bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded-full">
+                  {alertasRetorno.length}
+                </span>
+              )}
+            </button>
+          </nav>
+        </div>
+
+        {/* Perfil da Oficina no Rodapé da Sidebar */}
+        <div className="pt-4 border-t border-[#1c2e42] space-y-3">
+          <div className="bg-[#0e1724] border border-[#1c2e42] p-3 rounded-2xl flex items-center justify-between">
+            <div className="min-w-0 pr-2">
+              <div className="text-xs font-bold text-white truncate">
+                {currentOficina.nome}
+              </div>
+              <div className="text-[10px] text-emerald-400 font-mono mt-0.5">
+                ● Pátio Online
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              title="Sair"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* =========================================================================
+          2. CONTEÚDO PRINCIPAL (DESKTOP + MOBILE)
+      ========================================================================= */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        
+        {/* Top Header Barra de Busca e Usuário */}
+        <header className="sticky top-0 z-30 bg-[#080d14]/90 backdrop-blur-md border-b border-[#1c2e42] px-4 lg:px-8 py-3.5">
+          <div className="flex items-center justify-between gap-4">
+            
+            {/* Mobile: Logo e Ações */}
+            <div className="flex lg:hidden items-center justify-between w-full">
+              <PitTrackLogo size="sm" />
+              <div className="flex items-center gap-2">
                 <Link
                   href="/nova-os"
-                  className="inline-flex items-center gap-1.5 bg-emerald-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl"
+                  className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-xl shadow-md shadow-emerald-500/20"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  Criar Nova OS
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>Nova OS</span>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Desktop: Barra de Busca Estilo PitTrack */}
+            <div className="hidden lg:flex items-center flex-1 max-w-xl">
+              <div className="relative w-full">
+                <Search className="w-4 h-4 text-[#5c7287] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por cliente, veículo, placa ou nº da OS..."
+                  className="w-full bg-[#0d1622] border border-[#1c2e42] rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-[#5c7287] focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Desktop: Notificações & Perfil do Gerente */}
+            <div className="hidden lg:flex items-center gap-4">
+              <button 
+                title="Notificações"
+                className="relative p-2 rounded-xl text-[#8b9eb0] hover:text-white hover:bg-[#111e2e] transition-colors"
+              >
+                <Bell className="w-4 h-4" />
+                <span className="w-2 h-2 rounded-full bg-emerald-400 absolute top-2 right-2 ring-2 ring-[#080d14]" />
+              </button>
+
+              <div className="flex items-center gap-3 pl-2 border-l border-[#1c2e42]">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold text-xs font-mono shadow-sm">
+                  {currentOficina.nome.substring(0, 2).toUpperCase()}
+                </div>
+                <div className="text-left">
+                  <div className="text-xs font-bold text-white flex items-center gap-1">
+                    <span>{currentOficina.nome.split('-')[0].trim()}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-[#5c7287]" />
+                  </div>
+                  <div className="text-[10px] text-[#8b9eb0]">Gerente de Oficina</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile Search Bar */}
+          <div className="mt-3 lg:hidden">
+            <div className="relative w-full">
+              <Search className="w-3.5 h-3.5 text-[#5c7287] absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar por cliente, placa ou OS..."
+                className="w-full bg-[#0d1622] border border-[#1c2e42] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder:text-[#5c7287] focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          </div>
+        </header>
+
+        {/* Layout de Duas Colunas no Desktop: Centro (Ordens) + Direita (Today's Overview) */}
+        <div className="flex-1 flex flex-col xl:flex-row p-4 lg:p-8 gap-6">
+          
+          {/* =========================================================================
+              ÁREA CENTRAL: LISTA DE ORDENS DE SERVIÇO
+          ========================================================================= */}
+          <main className="flex-1 min-w-0 space-y-5">
+            
+            {/* Header da Página: Título + Botão Nova OS */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h1 className="text-xl lg:text-2xl font-black text-white tracking-tight">
+                  {activeTab === 'ALERTAS' ? 'Alertas de Retorno Preventivo' : 'Ordens de Serviço'}
+                </h1>
+                <p className="text-xs text-[#8b9eb0] mt-0.5">
+                  {activeTab === 'ALERTAS'
+                    ? 'Veículos com revisão ou troca de óleo vencendo em 15 dias'
+                    : 'Gerencie e acompanhe todas as ordens de serviço do pátio'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/nova-os"
+                  className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 transition-all text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-500/25 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>+ Nova Ordem de Serviço</span>
                 </Link>
               </div>
-            ) : (
-              patioOrdens.map((os) => {
-                const publicUrl = typeof window !== 'undefined'
-                  ? `${window.location.origin}/os/${os.id}`
-                  : `/os/${os.id}`;
+            </div>
 
-                const whatsAppLink = generateWhatsAppLinkParaCliente(os, currentOficina?.nome || 'Oficina', publicUrl);
+            {/* Abas de Filtros (Pills fieis ao Mockup) */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              <button
+                onClick={() => setActiveTab('ALL')}
+                className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
+                  activeTab === 'ALL'
+                    ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                    : 'bg-[#0e1724] text-[#8b9eb0] hover:text-white border border-[#1c2e42]'
+                }`}
+              >
+                <span>Todas</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${activeTab === 'ALL' ? 'bg-slate-950/20' : 'bg-[#182635]'}`}>
+                  {countAll}
+                </span>
+              </button>
 
-                return (
-                  <div
-                    key={os.id}
-                    className={`bg-slate-900/90 rounded-2xl border transition-all duration-300 p-4 shadow-lg ${
-                      os.status === 'APROVADO'
-                        ? 'border-emerald-500/50 bg-gradient-to-b from-slate-900 via-slate-900 to-emerald-950/20'
-                        : 'border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    {/* Linha Superior: Placa estilo Mercosul + Código + Badge */}
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-2">
-                        {/* Placa estilo Mercosul */}
-                        <div className="border border-slate-700 rounded-lg overflow-hidden shadow-sm bg-slate-950 text-center flex flex-col justify-center min-w-[84px]">
-                          <div className="bg-blue-600 text-[8px] font-black tracking-widest text-white py-0.5 px-1 uppercase flex items-center justify-between">
-                            <span>BRASIL</span>
-                            <span className="w-1.5 h-1 rounded-xs bg-yellow-400 inline-block" />
-                          </div>
-                          <div className="font-mono font-black text-xs text-white px-2 py-0.5 tracking-wider">
-                            {os.veiculo_placa}
-                          </div>
-                        </div>
+              <button
+                onClick={() => setActiveTab('ORCAMENTO')}
+                className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
+                  activeTab === 'ORCAMENTO'
+                    ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                    : 'bg-[#0e1724] text-[#8b9eb0] hover:text-white border border-[#1c2e42]'
+                }`}
+              >
+                <span>Orçamentos</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${activeTab === 'ORCAMENTO' ? 'bg-slate-950/20' : 'bg-[#182635]'}`}>
+                  {countOpen}
+                </span>
+              </button>
 
-                        <div>
-                          <span className="text-[11px] font-mono text-slate-400 font-semibold block">
-                            {os.codigo_curto}
-                          </span>
-                          <h2 className="text-sm font-bold text-white leading-tight">
+              <button
+                onClick={() => setActiveTab('EM_SERVICO')}
+                className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
+                  activeTab === 'EM_SERVICO'
+                    ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                    : 'bg-[#0e1724] text-[#8b9eb0] hover:text-white border border-[#1c2e42]'
+                }`}
+              >
+                <span>Em Serviço</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${activeTab === 'EM_SERVICO' ? 'bg-slate-950/20' : 'bg-[#182635]'}`}>
+                  {countInProgress}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('APROVADO')}
+                className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
+                  activeTab === 'APROVADO'
+                    ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                    : 'bg-[#0e1724] text-[#8b9eb0] hover:text-white border border-[#1c2e42]'
+                }`}
+              >
+                <span>Aprovadas</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${activeTab === 'APROVADO' ? 'bg-slate-950/20' : 'bg-[#182635]'}`}>
+                  {countPartsOrdered}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('FINALIZADO')}
+                className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
+                  activeTab === 'FINALIZADO'
+                    ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                    : 'bg-[#0e1724] text-[#8b9eb0] hover:text-white border border-[#1c2e42]'
+                }`}
+              >
+                <span>Finalizadas</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${activeTab === 'FINALIZADO' ? 'bg-slate-950/20' : 'bg-[#182635]'}`}>
+                  {countCompleted}
+                </span>
+              </button>
+            </div>
+
+            {/* Exibição em Tabela (Desktop) */}
+            <div className="hidden lg:block bg-[#0e1724] border border-[#1c2e42] rounded-2xl overflow-hidden shadow-xl">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#1c2e42] bg-[#0b121b] text-[#5c7287] font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-3.5 px-4">Nº OS</th>
+                    <th className="py-3.5 px-4">Cliente</th>
+                    <th className="py-3.5 px-4">Veículo</th>
+                    <th className="py-3.5 px-4">Placa / KM</th>
+                    <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4 text-right">Total</th>
+                    <th className="py-3.5 px-4">Entrada</th>
+                    <th className="py-3.5 px-4 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#182738]">
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-[#8b9eb0]">
+                        Carregando ordens de serviço...
+                      </td>
+                    </tr>
+                  ) : filteredOrdens.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-[#8b9eb0]">
+                        Nenhuma ordem de serviço localizada nesta categoria.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredOrdens.map((os) => {
+                      const whatsAppLink = generateWhatsAppLinkParaCliente(
+                        {
+                          cliente_nome: os.cliente_nome,
+                          cliente_whatsapp: os.cliente_whatsapp,
+                          veiculo_modelo: os.veiculo_modelo,
+                          veiculo_placa: os.veiculo_placa,
+                          codigo_curto: os.codigo_curto,
+                          id: os.id,
+                        },
+                        currentOficina.nome,
+                        typeof window !== 'undefined' ? `${window.location.origin}/os/${os.id}` : ''
+                      );
+
+                      return (
+                        <tr
+                          key={os.id}
+                          className="hover:bg-[#121f2f] transition-colors group text-[#cbd5e1]"
+                        >
+                          <td className="py-3.5 px-4 font-mono font-bold text-white">
+                            #{os.codigo_curto}
+                          </td>
+                          <td className="py-3.5 px-4 font-semibold text-white">
+                            {os.cliente_nome}
+                          </td>
+                          <td className="py-3.5 px-4 text-[#8b9eb0]">
                             {os.veiculo_modelo}
-                          </h2>
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-[11px]">
+                            <span className="text-white font-bold">{os.veiculo_placa}</span>
+                            <span className="text-[#5c7287] ml-1.5 font-normal">
+                              ({os.km_atual ? `${os.km_atual.toLocaleString('pt-BR')} km` : 'N/A'})
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {renderStatusBadge(os)}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono font-bold text-emerald-400">
+                            R$ {Number(os.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3.5 px-4 text-[#5c7287] font-mono text-[11px]">
+                            {new Date(os.created_at).toLocaleDateString('pt-BR')}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <Link
+                                href={`/os/${os.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Visualizar Link do Cliente"
+                                className="p-1.5 rounded-lg text-[#8b9eb0] hover:text-white hover:bg-[#1c2e42] transition-colors"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </Link>
+                              <a
+                                href={whatsAppLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Enviar pelo WhatsApp"
+                                className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </a>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Exibição em Cards Mobile (Fiel ao Mockup do iPhone à Esquerda) */}
+            <div className="lg:hidden space-y-4">
+              {isLoading ? (
+                <div className="py-12 text-center text-[#8b9eb0]">
+                  Carregando ordens...
+                </div>
+              ) : filteredOrdens.length === 0 ? (
+                <div className="py-12 text-center text-[#8b9eb0]">
+                  Nenhuma ordem encontrada.
+                </div>
+              ) : (
+                filteredOrdens.map((os) => {
+                  const whatsAppLink = generateWhatsAppLinkParaCliente(
+                    {
+                      cliente_nome: os.cliente_nome,
+                      cliente_whatsapp: os.cliente_whatsapp,
+                      veiculo_modelo: os.veiculo_modelo,
+                      veiculo_placa: os.veiculo_placa,
+                      codigo_curto: os.codigo_curto,
+                      id: os.id,
+                    },
+                    currentOficina.nome,
+                    typeof window !== 'undefined' ? `${window.location.origin}/os/${os.id}` : ''
+                  );
+
+                  return (
+                    <div
+                      key={os.id}
+                      className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-lg space-y-3.5"
+                    >
+                      {/* Topo do Card: Work Order # + Status Pill */}
+                      <div className="flex items-center justify-between border-b border-[#182738] pb-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-black text-sm text-white tracking-tight">
+                            Ordem de Serviço #{os.codigo_curto}
+                          </span>
                         </div>
+                        {renderStatusBadge(os)}
                       </div>
 
-                      {/* Badge de Status */}
-                      <div>{getStatusBadge(os.status)}</div>
-                    </div>
-
-                    {/* Detalhes do Cliente e KM */}
-                    <div className="bg-slate-950/60 rounded-xl p-2.5 mb-3 border border-slate-800/80 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 truncate">
-                        <span className="text-slate-400">Cliente:</span>
-                        <span className="font-semibold text-slate-200 truncate">{os.cliente_nome}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-slate-400 flex-shrink-0 font-mono text-[11px]">
-                        <Gauge className="w-3.5 h-3.5 text-amber-500" />
-                        <span>{os.km_atual.toLocaleString('pt-BR')} km</span>
-                      </div>
-                    </div>
-
-                    {/* Fotos de Entrada Miniaturas (se houver) */}
-                    {os.fotos_entrada && os.fotos_entrada.length > 0 && (
-                      <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1">
-                        {os.fotos_entrada.map((foto, idx) => (
-                          <div
-                            key={idx}
-                            className="w-14 h-14 rounded-lg overflow-hidden border border-slate-700 flex-shrink-0 bg-slate-950 relative group"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={foto}
-                              alt={`Foto ${idx + 1}`}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                            />
-                          </div>
-                        ))}
-                        <span className="text-[10px] text-slate-500 flex-shrink-0">
-                          {os.fotos_entrada.length} {os.fotos_entrada.length === 1 ? 'foto' : 'fotos'}
+                      {/* Cliente */}
+                      <div className="flex items-center gap-2 text-xs text-[#8b9eb0]">
+                        <User className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                        <span className="font-semibold text-white truncate">
+                          {os.cliente_nome}
                         </span>
                       </div>
-                    )}
 
-                    {/* Valor Total e Data de Aprovação */}
-                    <div className="flex items-baseline justify-between border-t border-slate-800/80 pt-2.5 mb-3">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                      {/* Veículo & Placa */}
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 text-[#8b9eb0] min-w-0">
+                          <Car className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                          <span className="text-white truncate font-medium">
+                            {os.veiculo_modelo}
+                          </span>
+                        </div>
+                        <span className="font-mono font-bold text-xs bg-[#0b121b] border border-[#1c2e42] px-2 py-0.5 rounded text-white flex-shrink-0">
+                          {os.veiculo_placa}
+                        </span>
+                      </div>
+
+                      {/* Resumo de Valor Total Estilo Mockup Mobile */}
+                      <div className="bg-[#091018] rounded-xl p-3 border border-[#182738] flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#8b9eb0] uppercase tracking-wider">
                           Valor Total
                         </span>
-                        <span className="text-lg font-black text-emerald-400">
+                        <span className="text-base font-black text-emerald-400 font-mono">
                           R$ {Number(os.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
 
-                      {mounted && os.aprovado_em && (
-                        <div className="text-right">
-                          <span className="text-[9px] uppercase font-bold text-emerald-500 block">
-                            Aprovado em
-                          </span>
-                          <span className="text-[11px] text-slate-300 font-mono">
-                            {new Date(os.aprovado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} ({new Date(os.aprovado_em).toLocaleDateString('pt-BR')})
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Botões de Ação Mobile */}
-                    <div className="grid grid-cols-2 gap-2">
-                      {/* Botão Link Público */}
-                      <Link
-                        href={`/os/${os.id}`}
-                        className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs font-bold py-2.5 px-3 rounded-xl border border-slate-700 transition-all"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Abrir Link Público</span>
-                      </Link>
-
-                      {/* Botão WhatsApp */}
-                      <a
-                        href={whatsAppLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-slate-950 font-bold text-xs py-2.5 px-3 rounded-xl shadow-md shadow-emerald-950 transition-all"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5 fill-current" />
-                        <span>Chamar WhatsApp</span>
-                      </a>
-                    </div>
-
-                    {/* Botão de Demonstração Rápida: Simular Aprovação do Cliente */}
-                    {os.status === 'ORCAMENTO' && (
-                      <div className="mt-2.5 pt-2 border-t border-dashed border-slate-800/80 flex items-center justify-between">
-                        <span className="text-[10px] text-amber-400/80 font-medium flex items-center gap-1">
-                          <Zap className="w-3 h-3 text-amber-400" />
-                          Modo Demo:
-                        </span>
-                        <button
-                          onClick={() => handleSimularAprovacao(os.id, os.codigo_curto)}
-                          className="text-[10px] font-bold text-amber-300 hover:text-amber-200 underline underline-offset-2 flex items-center gap-1"
+                      {/* Ações Mobile */}
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <Link
+                          href={`/os/${os.id}`}
+                          className="flex items-center justify-center gap-1.5 bg-[#122030] hover:bg-[#16293d] text-white text-xs font-bold py-2.5 px-3 rounded-xl border border-[#1e344d] transition-all text-center"
                         >
-                          Simular Aprovação do Cliente agora
-                          <ArrowRight className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
+                          <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Link do Cliente</span>
+                        </Link>
 
-        {/* CONTEÚDO DA ABA 2: ALERTAS DE RETORNO (6 MESES) */}
-        {activeTab === 'alertas' && (
-          <div className="space-y-3">
-            {/* Banner Informativo de Retenção */}
-            <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 rounded-2xl p-3.5">
-              <div className="flex items-start gap-2.5">
-                <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="text-xs font-bold text-amber-300">
-                    Máquina de Vendas: Alertas Preventivos de 6 Meses
-                  </h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                    Clientes com revisão programada vencida ou próxima (15 dias). Clique para enviar lembrete pronto e recuperar faturamento!
+                        <a
+                          href={whatsAppLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold py-2.5 px-3 rounded-xl shadow-md shadow-emerald-500/20 transition-all text-center"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                          <span>WhatsApp</span>
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Seção de Alertas Preventivos (quando aba Alertas está selecionada) */}
+            {activeTab === 'ALERTAS' && (
+              <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-5 space-y-4 shadow-xl">
+                <div className="flex items-center justify-between border-b border-[#1c2e42] pb-3">
+                  <span className="text-sm font-bold text-white flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-amber-400" />
+                    <span>Revisões Preventivas & Trocas de Óleo Vencidas / a Vencer</span>
+                  </span>
+                  <span className="text-xs text-amber-400 font-mono font-bold">
+                    {alertasRetorno.length} identificadas
+                  </span>
+                </div>
+
+                {alertasRetorno.length === 0 ? (
+                  <p className="text-xs text-[#8b9eb0] py-4 text-center">
+                    Todas as revisões preventivas de 6 meses estão em dia!
                   </p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {alertasRetorno.map((os) => {
+                      const revisaoLink = generateWhatsAppRevisaoLink(os, currentOficina.nome);
+                      return (
+                        <div
+                          key={os.id}
+                          className="bg-[#0a121b] border border-[#1c2e42] rounded-xl p-3.5 flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-white truncate">
+                              {os.cliente_nome}
+                            </div>
+                            <div className="text-[11px] text-[#8b9eb0] truncate">
+                              {os.veiculo_modelo} • {os.veiculo_placa}
+                            </div>
+                            <span
+                              className={`inline-block text-[10px] font-bold px-1.5 py-0.2 rounded mt-1 ${
+                                os.isVencido
+                                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                              }`}
+                            >
+                              {os.isVencido ? `Venceu há ${Math.abs(os.diffDays)} dias` : `Vence em ${os.diffDays} dias`}
+                            </span>
+                          </div>
+
+                          <a
+                            href={revisaoLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-md shadow-emerald-500/20 flex-shrink-0"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                            <span>Avisar</span>
+                          </a>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </main>
+
+          {/* =========================================================================
+              3. PAINEL LATERAL DIREITO (DESKTOP): TODAY'S OVERVIEW & BUDGET TOTALS
+              (Fiel ao Mockup do MacBook na Imagem)
+          ========================================================================= */}
+          <aside className="hidden xl:flex w-80 flex-col gap-5 flex-shrink-0">
+            
+            {/* Card 1: Today's Overview */}
+            <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-[#1c2e42] pb-3">
+                <h3 className="text-sm font-bold text-white tracking-tight">
+                  Resumo do Dia
+                </h3>
+                <span className="text-[11px] text-[#5c7287] font-mono">
+                  {new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
+
+              {/* Métricas Rápidas com Ícones Verdes */}
+              <div className="space-y-3">
+                <div className="bg-[#091018] border border-[#182738] p-3 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs text-[#8b9eb0] font-medium">Total de Ordens</span>
+                  </div>
+                  <span className="text-base font-black text-white font-mono">{countAll}</span>
+                </div>
+
+                <div className="bg-[#091018] border border-[#182738] p-3 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center">
+                      <Wrench className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs text-[#8b9eb0] font-medium">Em Serviço</span>
+                  </div>
+                  <span className="text-base font-black text-sky-400 font-mono">{countInProgress}</span>
+                </div>
+
+                <div className="bg-[#091018] border border-[#182738] p-3 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs text-[#8b9eb0] font-medium">Em Orçamento</span>
+                  </div>
+                  <span className="text-base font-black text-emerald-400 font-mono">{countOpen}</span>
+                </div>
+
+                <div className="bg-[#091018] border border-[#182738] p-3 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 flex items-center justify-center">
+                      <Check className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs text-[#8b9eb0] font-medium">Finalizadas</span>
+                  </div>
+                  <span className="text-base font-black text-slate-300 font-mono">{countCompleted}</span>
                 </div>
               </div>
             </div>
 
-            {/* Listagem de Alertas */}
-            {alertasRetorno.length === 0 ? (
-              <div className="bg-slate-900/50 border border-dashed border-slate-800 rounded-2xl p-8 text-center">
-                <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-slate-200">Nenhum cliente vencido no momento</p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Todas as revisões e trocas de óleo estão em dia.
-                </p>
+            {/* Card 2: Budget Totals */}
+            <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-5 shadow-xl space-y-3">
+              <h3 className="text-sm font-bold text-white tracking-tight border-b border-[#1c2e42] pb-3">
+                Totais Financeiros
+              </h3>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between text-[#8b9eb0]">
+                  <span>Mão de Obra</span>
+                  <span className="font-mono font-bold text-white">
+                    R$ {totalMaoDeObraEst.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[#8b9eb0]">
+                  <span>Peças & Componentes</span>
+                  <span className="font-mono font-bold text-white">
+                    R$ {totalPecasEst.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[#8b9eb0]">
+                  <span>Insumos & Outros</span>
+                  <span className="font-mono font-bold text-white">
+                    R$ {totalOutrosEst.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                <div className="pt-3 border-t border-[#1c2e42] flex items-baseline justify-between">
+                  <span className="text-xs uppercase font-extrabold text-[#8b9eb0] tracking-wider">
+                    Total
+                  </span>
+                  <span className="text-2xl font-black text-emerald-400 font-mono">
+                    R$ {totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
-            ) : (
-              alertasRetorno.map((os) => {
-                const revisaoLink = generateWhatsAppRevisaoLink(os, currentOficina?.nome || 'Oficina Mecânica');
-                const dataFormatada = mounted && os.data_proximo_retorno
-                  ? new Date(os.data_proximo_retorno).toLocaleDateString('pt-BR')
-                  : os.data_proximo_retorno || 'N/A';
+            </div>
 
-                return (
-                  <div
-                    key={os.id}
-                    className={`bg-slate-900 rounded-2xl border p-4 shadow-lg ${
-                      os.isVencido
-                        ? 'border-rose-500/40 bg-gradient-to-b from-slate-900 to-rose-950/15'
-                        : 'border-amber-500/40 bg-gradient-to-b from-slate-900 to-amber-950/15'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold px-2 py-0.5 bg-slate-950 rounded border border-slate-700 text-slate-200">
-                            {os.veiculo_placa}
-                          </span>
-                          <span className="text-xs font-bold text-white">{os.veiculo_modelo}</span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-1">
-                          Cliente: <strong className="text-slate-200">{os.cliente_nome}</strong>
-                        </p>
-                      </div>
+            {/* Card 3: Work Orders This Week (Mini Gráfico SVG) */}
+            <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-5 shadow-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-white tracking-tight">
+                  Ordens Nesta Semana
+                </h3>
+                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  +18%
+                </span>
+              </div>
 
-                      {/* Badge de Vencimento */}
-                      <div>
-                        {os.isVencido ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40">
-                            🚨 Vencido há {Math.abs(os.diffDays)} dias
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40">
-                            ⏳ Vence em {os.diffDays === 0 ? 'Hoje' : `${os.diffDays} dias`}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+              {/* Gráfico SVG estilo Sparkline da Imagem */}
+              <div className="pt-2">
+                <svg viewBox="0 0 240 60" className="w-full h-16 stroke-emerald-400 fill-none">
+                  <defs>
+                    <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#22c55e" stopOpacity="0.3" />
+                      <stop offset="100%" stopColor="#22c55e" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  {/* Curva de fundo */}
+                  <path
+                    d="M 0 45 Q 40 20, 80 35 T 160 15 T 240 30"
+                    stroke="#1c2e42"
+                    strokeWidth="2"
+                  />
+                  {/* Curva ativa verde neon */}
+                  <path
+                    d="M 0 50 Q 40 10, 80 40 T 160 20 T 240 10"
+                    stroke="#22c55e"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                  {/* Pontos nos picos */}
+                  <circle cx="40" cy="22" r="3" fill="#22c55e" />
+                  <circle cx="120" cy="30" r="3" fill="#22c55e" />
+                  <circle cx="200" cy="15" r="3" fill="#22c55e" />
+                </svg>
 
-                    <div className="bg-slate-950/70 rounded-xl p-2.5 my-2.5 border border-slate-800 text-[11px] flex items-center justify-between text-slate-400">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Data do Retorno:</span>
-                        <strong className="text-slate-200">{dataFormatada}</strong>
-                      </div>
-                      <div className="font-mono">
-                        Último KM: <strong>{os.km_atual.toLocaleString('pt-BR')}</strong>
-                      </div>
-                    </div>
+                <div className="flex items-center justify-between text-[10px] text-[#5c7287] font-mono mt-2 pt-1 border-t border-[#182738]">
+                  <span>Seg</span>
+                  <span>Ter</span>
+                  <span>Qua</span>
+                  <span>Qui</span>
+                  <span>Sex</span>
+                  <span>Sáb</span>
+                  <span>Dom</span>
+                </div>
+              </div>
+            </div>
 
-                    {/* Botão de Reativação no WhatsApp */}
-                    <a
-                      href={revisaoLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-xs py-3 px-4 rounded-xl shadow-lg shadow-emerald-500/20 transition-all uppercase tracking-wide"
-                    >
-                      <MessageCircle className="w-4 h-4 fill-current" />
-                      <span>Reativar Cliente no WhatsApp</span>
-                    </a>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
-      </main>
-
-      {/* Barra de Navegação Inferior Mobile-First */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 px-6 py-2.5">
-        <div className="max-w-md mx-auto flex items-center justify-around">
-          <button
-            onClick={() => setActiveTab('patio')}
-            className={`flex flex-col items-center gap-1 py-1 transition-all ${
-              activeTab === 'patio' ? 'text-amber-400 scale-105' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            <Car className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Pátio</span>
-          </button>
-
-          <Link
-            href="/nova-os"
-            className="flex flex-col items-center justify-center -mt-5 bg-gradient-to-r from-emerald-500 to-emerald-400 text-slate-950 w-12 h-12 rounded-full shadow-xl shadow-emerald-500/30 border-4 border-slate-950 active:scale-90 transition-transform font-black"
-          >
-            <Plus className="w-6 h-6 stroke-[3]" />
-          </Link>
-
-          <button
-            onClick={() => setActiveTab('alertas')}
-            className={`flex flex-col items-center gap-1 py-1 transition-all ${
-              activeTab === 'alertas' ? 'text-emerald-400 scale-105' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            <AlertTriangle className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Retorno 6M</span>
-          </button>
+          </aside>
         </div>
+      </div>
+
+      {/* =========================================================================
+          4. MOBILE BOTTOM NAVIGATION (Fiel ao Mockup do iPhone)
+      ========================================================================= */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#080d14]/95 backdrop-blur-xl border-t border-[#1c2e42] px-4 py-2 flex items-center justify-around">
+        <button
+          onClick={() => setActiveTab('ALL')}
+          className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-colors ${
+            activeTab === 'ALL' ? 'text-emerald-400' : 'text-[#8b9eb0] hover:text-white'
+          }`}
+        >
+          <LayoutDashboard className="w-5 h-5" />
+          <span>Início</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ORCAMENTO')}
+          className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-colors ${
+            activeTab === 'ORCAMENTO' ? 'text-emerald-400' : 'text-[#8b9eb0] hover:text-white'
+          }`}
+        >
+          <Wrench className="w-5 h-5" />
+          <span>Ordens</span>
+        </button>
+
+        <Link
+          href="/nova-os"
+          className="flex flex-col items-center gap-1 -mt-4 text-[10px] font-black text-slate-950"
+        >
+          <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center text-slate-950 shadow-lg shadow-emerald-500/40">
+            <Plus className="w-6 h-6 stroke-[3]" />
+          </div>
+          <span className="text-emerald-400 font-bold">Nova OS</span>
+        </Link>
+
+        <button
+          onClick={() => setActiveTab('ALERTAS')}
+          className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-colors ${
+            activeTab === 'ALERTAS' ? 'text-emerald-400' : 'text-[#8b9eb0] hover:text-white'
+          }`}
+        >
+          <Calendar className="w-5 h-5" />
+          <span>Alertas</span>
+        </button>
+
+        <button
+          onClick={handleLogout}
+          className="flex flex-col items-center gap-1 text-[10px] font-bold text-[#8b9eb0] hover:text-rose-400 transition-colors"
+        >
+          <LogOut className="w-5 h-5" />
+          <span>Sair</span>
+        </button>
       </nav>
+
     </div>
   );
 }

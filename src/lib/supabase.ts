@@ -30,16 +30,19 @@ export const DEMO_OFICINAS: Oficina[] = [
     id: '11111111-1111-1111-1111-111111111111',
     nome: 'AutoCenter Líder - Centro Automotivo',
     whatsapp: '5511999998888',
+    email: 'lider@oficina.com',
   },
   {
     id: '22222222-2222-2222-2222-222222222222',
     nome: 'Oficina Mecânica Alemão & Especialistas',
     whatsapp: '5511988887777',
+    email: 'alemao@oficina.com',
   },
   {
     id: '33333333-3333-3333-3333-333333333333',
     nome: 'CarTech Performance & Injeção Eletrônica',
     whatsapp: '5511977776666',
+    email: 'cartech@oficina.com',
   },
 ];
 

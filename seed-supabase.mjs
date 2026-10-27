@@ -72,7 +72,7 @@ async function seedData() {
     },
     {
       codigo_curto: 'OS-7910',
-      oficina_id: of1,
+      oficina_id: of2,
       cliente_nome: 'Juliana Mendes Santos',
       cliente_whatsapp: '5511985554321',
       veiculo_placa: 'ABC1D23',
