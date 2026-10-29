@@ -172,4 +172,5 @@ Acesse [http://localhost:3000](http://localhost:3000) no seu navegador. O sistem
 
 - 📋 **Guia de Pré-Requisitos para Clientes:** [`PRE_REQUISITOS_IMPLANTACAO.md`](./PRE_REQUISITOS_IMPLANTACAO.md) — Tudo o que uma oficina mecânica precisa fornecer e providenciar para começar a usar o sistema em 15 minutos.
 - 💼 **Plano de Ação Comercial & Vendas:** [`PLANO_DE_ACAO_VENDAS.md`](./PLANO_DE_ACAO_VENDAS.md) — Estratégia de abordagem, roteiro de demonstração em 3 minutos, quebra de objeções e tabela de preços.
+- 🗺️ **Rota de Visitas em Campo (Canoas/RS):** [`ROTA_DE_VISITAS_CANOAS.md`](./ROTA_DE_VISITAS_CANOAS.md) — Roteiro geográfico otimizado de 16 potenciais clientes por bairros (Estância Velha, Guajuviras, Rio Branco).
 - 🛠️ **Relatório Técnico & Auditoria:** [`RELATORIO_AUDITORIA.md`](./RELATORIO_AUDITORIA.md) — Histórico de arquitetura, evidências de testes (100% de sucesso), compilação e correções.

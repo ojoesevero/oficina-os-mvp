@@ -160,6 +160,7 @@ Após o cliente aceitar o teste ou fechar o contrato, execute o processo rápido
 
 ## 📑 Documentos e Manuais de Apoio
 
+- 🗺️ **Rota de Visitas em Campo (Canoas/RS):** [`ROTA_DE_VISITAS_CANOAS.md`](./ROTA_DE_VISITAS_CANOAS.md)  
 - 📋 **Guia de Pré-Requisitos para Oficinas:** [`PRE_REQUISITOS_IMPLANTACAO.md`](./PRE_REQUISITOS_IMPLANTACAO.md)  
 - 🛠️ **Relatório Técnico & Testes:** [`RELATORIO_AUDITORIA.md`](./RELATORIO_AUDITORIA.md)  
 - 📖 **Manual Técnico e Arquitetura do Sistema:** [`README.md`](./README.md)
