@@ -171,4 +171,4 @@ Acesse [http://localhost:3000](http://localhost:3000) no seu navegador. O sistem
 ## 📑 Documentação e Manuais
 
 - 📋 **Guia de Pré-Requisitos para Clientes:** [`PRE_REQUISITOS_IMPLANTACAO.md`](./PRE_REQUISITOS_IMPLANTACAO.md) — Tudo o que uma oficina mecânica precisa fornecer e providenciar para começar a usar o sistema em 15 minutos.
-- 🛠️ **Relatório Técnico & Auditoria:** [`relatorio_auditoria_e_melhorias.md`](file:///C:/Users/jonat/.gemini/antigravity-ide/brain/933c90e6-a0ed-482e-8a25-15b14831db94/relatorio_auditoria_e_melhorias.md) — Histórico de arquitetura, testes e correções.
+- 🛠️ **Relatório Técnico & Auditoria:** [`RELATORIO_AUDITORIA.md`](./RELATORIO_AUDITORIA.md) — Histórico de arquitetura, evidências de testes (100% de sucesso), compilação e correções.

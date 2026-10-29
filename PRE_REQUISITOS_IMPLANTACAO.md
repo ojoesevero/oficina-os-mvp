@@ -86,4 +86,5 @@ O sistema é **100% responsivo (funciona em telas de qualquer tamanho)** e roda 
 ## 📞 Suporte e Contato Técnico
 Para dúvidas na ativação ou cadastro de novas oficinas:
 - **Plataforma**: JS OrçaFácil — Sistema de Gestão Ágil para Oficinas
-- **Documentação de Código**: Consulte o arquivo [`README.md`](./README.md)
+- **Documentação do Sistema**: Consulte o arquivo [`README.md`](./README.md)
+- **Relatório de Auditoria e Testes**: Consulte [`RELATORIO_AUDITORIA.md`](./RELATORIO_AUDITORIA.md)
