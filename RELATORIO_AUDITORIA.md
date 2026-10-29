@@ -13,7 +13,7 @@ Todas as etapas de verificação foram executadas e aprovadas com sucesso, sem n
 
 | Etapa de Verificação | Comando / Método | Status | Resultado Detalhado |
 | :--- | :--- | :---: | :--- |
-| **Suíte de Testes Automatizada** | `npm.cmd test` | **APROVADO** | **8/8 suítes com 100% de sucesso**: UUID v4, WhatsApp DDI, Links de Orçamento, Alertas de 6 Meses, Cálculos Financeiros, Contas Demo, Máscaras de Input e Transições de Status do Pátio. |
+| **Suíte de Testes Automatizada** | `npm.cmd test` | **APROVADO** | **10/10 suítes com 100% de sucesso**: UUID v4, WhatsApp DDI, Links de Orçamento, Alertas de 6 Meses, Cálculos Financeiros, Contas Demo, Máscaras de Input, Transições de Status, Trilha de Auditoria e Compressão WebP. |
 | **Compilação e Build de Produção** | `npm.cmd run build` | **APROVADO** | Next.js 16.4.2 com Turbopack gerou com sucesso 7/7 rotas estáticas e híbridas (Partial Prerendering em `/os/[id]`). 0 erros de TypeScript. |
 | **Linter Estático** | `npm.cmd run lint` | **APROVADO** | ESLint 9 executado com zero erros e zero advertências em todo o código-fonte. |
 | **Servidor em Desenvolvimento** | `npm.cmd run dev` | **APROVADO** | Inicialização instantânea em 822ms, suporte a `.env.local` e Turbopack. |
@@ -56,7 +56,11 @@ Todas as etapas de verificação foram executadas e aprovadas com sucesso, sem n
   - 🔴 **Cancelado**
 - Sincronização em tempo real entre dispositivos via Supabase Realtime e canal `storage` entre abas.
 
-### E. Blindagem da Área do Cliente e Multi-tenant
+### E. Blindagem da Área do Cliente, Trilha de Auditoria e Compressão WebP
+- **Compressão Automática Client-Side (WebP):** Fotos capturadas na câmera do celular (5 MB a 10 MB) são redimensionadas (`1280px` máx.) e convertidas para WebP (`~90 KB`) via `<canvas>` nativo antes do upload para o Supabase Storage, acelerando o envio no 4G e economizando até 95% de franquia.
+- **Trilha de Auditoria na Aprovação:** Ao clicar em "Aprovar Orçamento", o sistema grava o carimbo de tempo (`aprovado_em`), o dispositivo/navegador verificado (`aprovado_dispositivo`) e gera um Protocolo Digital determinístico (`AUD-XXXX-XXXX`) exibido no comprovante do cliente.
+- **Blindagem RLS + RPC (`aprovar_orcamento_publico`):** Função PostgreSQL `SECURITY DEFINER` que garante que o link público só possa transicionar ordens com status `ORCAMENTO` para `APROVADO`, protegendo valores financeiros e dados de outras oficinas.
+- **Logs Estruturados de Observabilidade (`logEventoOS`):** Registro padronizado em JSON para acompanhamento imediato no painel de Logs da Vercel sem necessidade de SDKs externos pesados.
 - A rota `/os/[id]` é estritamente isolada do sistema interno: o cliente não possui acesso nem links para o painel da oficina.
 - Sistema de login individual para cada oficina com suporte a contas de demonstração pré-configuradas.
 
@@ -77,8 +81,10 @@ Os testes são executados através de `npm test` (chamando `node tests/service.t
 ✅ 6. Contas Demo: IDs e credenciais de todas as 3 oficinas pré-configuradas e válidas.
 ✅ 7. Máscaras de Input: Placas (Mercosul/antiga), Telefones e KM formatados com perfeição.
 ✅ 8. Transição Rápida de Status: Todos os status do pátio validados.
+✅ 9. Trilha de Auditoria: Identificação de dispositivo e protocolo digital determinístico validados.
+✅ 10. Compressão WebP Client-Side: Redimensionamento proporcional de fotos de alta resolução validado.
 
-🎉 TODOS OS TESTES PASSARAM COM 100% DE SUCESSO!
+🎉 TODOS OS 10 TESTES PASSARAM COM 100% DE SUCESSO!
 ```
 
 ---

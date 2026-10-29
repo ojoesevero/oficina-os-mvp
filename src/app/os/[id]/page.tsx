@@ -20,7 +20,13 @@ import {
   X
 } from 'lucide-react';
 import { OrdemServico, ItemOS, Oficina } from '@/types/database';
-import { fetchOrdemServicoById, aprovarOrçamento, formatWhatsAppNumber } from '@/lib/osService';
+import { 
+   fetchOrdemServicoById, 
+   aprovarOrçamento, 
+   formatWhatsAppNumber, 
+   detectarDispositivoCliente, 
+   gerarHashAuditoria 
+} from '@/lib/osService';
 import { useIsHydrated } from '@/lib/authService';
 import PitTrackLogo from '@/components/PitTrackLogo';
 
@@ -73,16 +79,25 @@ function OSClienteContent() {
     loadData();
   }, [id]);
 
-  // Função de Aprovação com Confetes
+  // Função de Aprovação com Confetes e Trilha de Auditoria
   const handleAprovar = async () => {
     if (!os) return;
     setIsApproving(true);
 
     try {
-      const ok = await aprovarOrçamento(os.id);
-      if (ok) {
+      const resultado = await aprovarOrçamento(os.id);
+      if (resultado.ok) {
         setIsApprovedSuccess(true);
-        setOs((prev) => prev ? { ...prev, status: 'APROVADO', aprovado_em: new Date().toISOString() } : null);
+        setOs((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: 'APROVADO',
+                aprovado_em: resultado.aprovado_em,
+                aprovado_dispositivo: `${resultado.aprovado_dispositivo} [${resultado.protocolo}]`,
+              }
+            : null
+        );
 
         try {
           confetti({
@@ -187,9 +202,28 @@ function OSClienteContent() {
                   A oficina {oficina?.nome || 'mecânica'} já recebeu a sua autorização em tempo real e a equipe mecânica iniciou o processo de separação de peças e execução do serviço.
                 </p>
                 {isHydrated && os.aprovado_em && (
-                  <p className="text-[10px] text-emerald-400 font-mono mt-1.5">
-                    Data da aprovação: {new Date(os.aprovado_em).toLocaleString('pt-BR')}
-                  </p>
+                  <div className="mt-2.5 pt-2.5 border-t border-emerald-500/30 space-y-1 text-[10px] font-mono text-emerald-300/90">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-400">Carimbo de Tempo:</span>
+                      <span className="font-bold text-emerald-300">
+                        {new Date(os.aprovado_em).toLocaleString('pt-BR')}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-400">Dispositivo:</span>
+                      <span className="text-slate-200 truncate max-w-[190px]">
+                        {os.aprovado_dispositivo
+                          ? os.aprovado_dispositivo.replace(/\s*\[AUD-[A-Z0-9-]+\]/, '')
+                          : detectarDispositivoCliente()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-400">Protocolo Digital:</span>
+                      <span className="bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded text-emerald-300 font-bold">
+                        {gerarHashAuditoria(os.id, os.aprovado_em)}
+                      </span>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

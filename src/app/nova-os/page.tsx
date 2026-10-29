@@ -13,7 +13,6 @@ import {
   Loader2, 
   MessageCircle, 
   AlertCircle,
-  UploadCloud,
   X,
   Building2,
   Car,
@@ -407,8 +406,8 @@ export default function NovaOSPage() {
                 <Camera className="w-4 h-4 text-emerald-400" />
                 <span>Fotos de Check-in na Oficina</span>
               </span>
-              <span className="text-[10px] text-[#5c7287]">
-                fotos-os
+              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                WebP Otimizado p/ 4G
               </span>
             </div>
 
@@ -451,12 +450,11 @@ export default function NovaOSPage() {
               {isUploadingPhoto ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                  <span>Enviando foto para o Supabase Storage...</span>
+                  <span>Comprimindo em WebP e enviando...</span>
                 </>
               ) : (
                 <>
                   <Camera className="w-4 h-4 text-emerald-400" />
-                  <UploadCloud className="w-4 h-4 text-[#8b9eb0]" />
                   <span>Tirar Foto ou Carregar da Galeria</span>
                 </>
               )}
@@ -488,7 +486,7 @@ export default function NovaOSPage() {
                     onClick={() => handleAddSugestao(sug)}
                     className="text-[10px] bg-[#080d14] border border-[#1c2e42] hover:border-emerald-500/50 text-[#8b9eb0] hover:text-white px-2 py-1 rounded-lg flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
                   >
-                    <span>+</span>
+                    <Plus className="w-3 h-3 text-emerald-400 flex-shrink-0" />
                     <span>{sug.descricao}</span>
                     <span className="text-emerald-400 font-bold font-mono">R${sug.valor}</span>
                   </button>
@@ -656,17 +654,19 @@ export default function NovaOSPage() {
                     setClienteWhatsapp('');
                     setFotos([]);
                   }}
-                  className="w-full text-emerald-400 hover:text-emerald-300 text-xs font-bold py-2 cursor-pointer transition-colors"
+                  className="w-full flex items-center justify-center gap-1.5 text-emerald-400 hover:text-emerald-300 text-xs font-bold py-2 cursor-pointer transition-colors"
                 >
-                  + Cadastrar Outro Veículo
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Cadastrar Outro Veículo</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => router.push('/')}
-                  className="w-full text-[#8b9eb0] hover:text-white text-xs py-1 transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-center gap-1.5 text-[#8b9eb0] hover:text-white text-xs py-1 transition-colors cursor-pointer"
                 >
-                  ← Voltar ao Pátio
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Voltar ao Pátio</span>
                 </button>
               </div>
             </div>

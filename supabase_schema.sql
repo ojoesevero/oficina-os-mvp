@@ -28,9 +28,13 @@ create table if not exists public.ordens_servico (
   status text not null check (status in ('ORCAMENTO', 'APROVADO', 'EM_SERVICO', 'FINALIZADO', 'CANCELADO')) default 'ORCAMENTO',
   valor_total numeric(10,2) not null default 0.00,
   aprovado_em timestamp with time zone,
+  aprovado_dispositivo text,
   data_proximo_retorno date,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Garantir coluna de auditoria de dispositivo em bancos já existentes
+alter table public.ordens_servico add column if not exists aprovado_dispositivo text;
 
 -- 4. Tabela de Itens da OS (Peças e Mão de Obra)
 create table if not exists public.itens_os (
@@ -66,7 +70,33 @@ create policy "Oficina autenticada insere nova OS" on public.ordens_servico
   for insert with check (true);
 
 create policy "Cliente pode aprovar orçamento ou oficina alterar status" on public.ordens_servico 
-  for update using (true);
+  for update using (true)
+  with check (status in ('ORCAMENTO', 'APROVADO', 'EM_SERVICO', 'FINALIZADO', 'CANCELADO'));
+
+-- 6.1 Função RPC Segura (SECURITY DEFINER) para aprovação pública em 1 clique com Trilha de Auditoria
+-- Garante que o link público só possa transicionar de ORCAMENTO -> APROVADO sem alterar valores financeiros
+create or replace function public.aprovar_orcamento_publico(
+  p_os_id uuid,
+  p_dispositivo text default 'Dispositivo Web Verificado'
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.ordens_servico
+  set status = 'APROVADO',
+      aprovado_em = timezone('utc'::text, now()),
+      aprovado_dispositivo = left(coalesce(p_dispositivo, 'Dispositivo Web Verificado'), 255)
+  where id = p_os_id
+    and status = 'ORCAMENTO';
+
+  return found;
+end;
+$$;
+
+grant execute on function public.aprovar_orcamento_publico(uuid, text) to anon, authenticated;
 
 -- Políticas de Itens da OS
 create policy "Leitura de itens da OS" on public.itens_os for select using (true);

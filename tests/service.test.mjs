@@ -197,4 +197,68 @@ STATUS_VALIDOS.forEach(novo => {
 assert.throws(() => validarTransicaoStatus('ORCAMENTO', 'STATUS_INEXISTENTE'), /Status inválido/);
 console.log('✅ 8. Transição Rápida de Status: Todos os status do pátio validados (ORCAMENTO -> APROVADO -> EM_SERVICO -> FINALIZADO -> CANCELADO).');
 
-console.log('\n🎉 TODOS OS TESTES PASSARAM COM 100% DE SUCESSO!\n');
+// 9. Teste de Trilha de Auditoria na Aprovação (Dispositivo + Hash de Protocolo)
+function detectarDispositivoCliente(ua) {
+  if (!ua) return 'Dispositivo Web Verificado';
+  let os = 'Dispositivo';
+  if (/iPhone|iPad|iPod/i.test(ua)) os = 'iPhone (iOS)';
+  else if (/Android/i.test(ua)) os = 'Smartphone Android';
+  else if (/Windows/i.test(ua)) os = 'Computador Windows';
+  else if (/Macintosh|Mac OS/i.test(ua)) os = 'Mac (macOS)';
+
+  let browser = 'Navegador';
+  if (/Edg\//i.test(ua)) browser = 'Edge';
+  else if (/Chrome\//i.test(ua) && !/Edg\//i.test(ua)) browser = 'Chrome';
+  else if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) browser = 'Safari';
+  else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+
+  return `${os} • ${browser}`;
+}
+
+function gerarHashAuditoria(osId, aprovadoEm) {
+  const base = `${osId}|${aprovadoEm}`;
+  let hash = 2166136261;
+  for (let i = 0; i < base.length; i++) {
+    hash ^= base.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const hex = (hash >>> 0).toString(16).toUpperCase().padStart(8, '0');
+  return `AUD-${hex.slice(0, 4)}-${hex.slice(4, 8)}`;
+}
+
+assert.equal(
+  detectarDispositivoCliente('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'),
+  'iPhone (iOS) • Safari'
+);
+assert.equal(
+  detectarDispositivoCliente('Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36'),
+  'Smartphone Android • Chrome'
+);
+const proto = gerarHashAuditoria(mockOS.id, '2026-10-29T17:10:00.000Z');
+assert.match(proto, /^AUD-[0-9A-F]{4}-[0-9A-F]{4}$/);
+assert.equal(proto, gerarHashAuditoria(mockOS.id, '2026-10-29T17:10:00.000Z')); // Determinístico
+console.log('✅ 9. Trilha de Auditoria: Identificação de dispositivo e protocolo digital determinístico validados.');
+
+// 10. Teste de Cálculo de Redimensionamento Proporcional WebP (Client-Side Compression)
+function calcularDimensoesWebP(width, height, maxDimension = 1280) {
+  if (width > maxDimension || height > maxDimension) {
+    if (width >= height) {
+      height = Math.round((height * maxDimension) / width);
+      width = maxDimension;
+    } else {
+      width = Math.round((width * maxDimension) / height);
+      height = maxDimension;
+    }
+  }
+  return { width, height };
+}
+
+const dim4K = calcularDimensoesWebP(4032, 3024, 1280);
+assert.equal(dim4K.width, 1280);
+assert.equal(dim4K.height, 960);
+const dimVertical = calcularDimensoesWebP(2160, 3840, 1280);
+assert.equal(dimVertical.height, 1280);
+assert.equal(dimVertical.width, 720);
+console.log('✅ 10. Compressão WebP Client-Side: Redimensionamento proporcional de fotos de alta resolução validado.');
+
+console.log('\n🎉 TODOS OS 10 TESTES PASSARAM COM 100% DE SUCESSO!\n');

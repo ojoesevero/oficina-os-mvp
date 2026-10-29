@@ -23,6 +23,7 @@ export interface OrdemServico {
   status: StatusOS;
   valor_total: number;
   aprovado_em: string | null;
+  aprovado_dispositivo?: string | null;
   data_proximo_retorno: string | null;
   created_at: string;
   oficinas?: Oficina;

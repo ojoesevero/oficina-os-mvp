@@ -153,14 +153,148 @@ export async function fetchOrdemServicoById(id: string): Promise<{ os: OrdemServ
   return { os, itens, oficina };
 }
 
-// 4. Upload de fotos para o bucket fotos-os
+// Logger estruturado leve para observabilidade na Vercel sem dependências pesadas
+export function logEventoOS(
+  nivel: 'INFO' | 'WARN' | 'ERROR',
+  acao: string,
+  detalhes?: Record<string, unknown>
+) {
+  const payload = {
+    ts: new Date().toISOString(),
+    app: 'js-orcafacil',
+    nivel,
+    acao,
+    ...detalhes,
+  };
+  if (nivel === 'ERROR') {
+    console.error('[JS-OrcaFacil]', JSON.stringify(payload));
+  } else if (nivel === 'WARN') {
+    console.warn('[JS-OrcaFacil]', JSON.stringify(payload));
+  } else {
+    console.info('[JS-OrcaFacil]', JSON.stringify(payload));
+  }
+}
+
+// Helper de Auditoria: identifica o dispositivo/navegador do cliente de forma legível
+export function detectarDispositivoCliente(ua?: string): string {
+  const rawUA = ua ?? (typeof navigator !== 'undefined' ? navigator.userAgent : '');
+  if (!rawUA) return 'Dispositivo Web Verificado';
+
+  let os = 'Dispositivo';
+  if (/iPhone|iPad|iPod/i.test(rawUA)) os = 'iPhone (iOS)';
+  else if (/Android/i.test(rawUA)) os = 'Smartphone Android';
+  else if (/Windows/i.test(rawUA)) os = 'Computador Windows';
+  else if (/Macintosh|Mac OS/i.test(rawUA)) os = 'Mac (macOS)';
+  else if (/Linux/i.test(rawUA)) os = 'Linux';
+
+  let browser = 'Navegador';
+  if (/Edg\//i.test(rawUA)) browser = 'Edge';
+  else if (/OPR\/|Opera/i.test(rawUA)) browser = 'Opera';
+  else if (/Chrome\//i.test(rawUA) && !/Edg\//i.test(rawUA)) browser = 'Chrome';
+  else if (/Safari\//i.test(rawUA) && !/Chrome\//i.test(rawUA)) browser = 'Safari';
+  else if (/Firefox\//i.test(rawUA)) browser = 'Firefox';
+
+  return `${os} • ${browser}`;
+}
+
+// Gera um código de protocolo de auditoria determinístico a partir do ID da OS e timestamp de aprovação
+export function gerarHashAuditoria(osId: string, aprovadoEm: string): string {
+  const base = `${osId}|${aprovadoEm}`;
+  let hash = 2166136261;
+  for (let i = 0; i < base.length; i++) {
+    hash ^= base.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const hex = (hash >>> 0).toString(16).toUpperCase().padStart(8, '0');
+  return `AUD-${hex.slice(0, 4)}-${hex.slice(4, 8)}`;
+}
+
+// Compressão automática Client-Side via <canvas> nativo para WebP (reduz fotos de 5-10MB para ~90KB)
+export async function compressImageToWebP(
+  file: File,
+  maxDimension = 1280,
+  quality = 0.78
+): Promise<File> {
+  if (typeof window === 'undefined' || !file.type.startsWith('image/')) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      try {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width >= height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            const cleanBaseName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+            const compressedFile = new File([blob], `${cleanBaseName}.webp`, {
+              type: 'image/webp',
+              lastModified: Date.now(),
+            });
+            logEventoOS('INFO', 'foto_comprimida_webp', {
+              originalKB: Math.round(file.size / 1024),
+              comprimidoKB: Math.round(compressedFile.size / 1024),
+              reducaoPct: Math.round((1 - compressedFile.size / Math.max(file.size, 1)) * 100),
+            });
+            resolve(compressedFile);
+          },
+          'image/webp',
+          quality
+        );
+      } catch {
+        resolve(file);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+// 4. Upload de fotos para o bucket fotos-os (com compressão WebP automática no navegador)
 export async function uploadFotoOS(file: File): Promise<string> {
-  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+  const optimizedFile = await compressImageToWebP(file);
+  const ext = optimizedFile.type === 'image/webp' ? 'webp' : file.name.split('.').pop() || 'jpg';
+  const baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${baseName}.${ext}`;
 
   if (isSupabaseConfigured) {
     try {
-      const { error } = await supabase.storage.from('fotos-os').upload(fileName, file, {
+      const { error } = await supabase.storage.from('fotos-os').upload(fileName, optimizedFile, {
         cacheControl: '3600',
+        contentType: optimizedFile.type || 'image/webp',
         upsert: false,
       });
 
@@ -170,20 +304,20 @@ export async function uploadFotoOS(file: File): Promise<string> {
           return publicUrlData.publicUrl;
         }
       } else {
-        console.warn('Falha no upload Supabase Storage:', error.message);
+        logEventoOS('WARN', 'falha_upload_supabase_storage', { erro: error.message, fileName });
       }
     } catch (err) {
-      console.warn('Erro de rede no upload Storage:', err);
+      logEventoOS('WARN', 'erro_rede_upload_storage', { erro: String(err) });
     }
   }
 
-  // Fallback demo: conversão para Data URL para funcionar visualmente sem credenciais
+  // Fallback demo: conversão do arquivo já comprimido para Data URL leve
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onloadend = () => {
       resolve(reader.result as string);
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(optimizedFile);
   });
 }
 
@@ -287,45 +421,100 @@ export async function createOrdemServico(input: NovaOSInput): Promise<{ id: stri
   return { id: newId, codigo_curto };
 }
 
-// 6. Atualizar Status de uma Ordem de Serviço (Transição Rápida no Pátio)
-export async function updateOrdemServicoStatus(id: string, newStatus: StatusOS): Promise<boolean> {
+// 6. Atualizar Status de uma Ordem de Serviço (Transição Rápida no Pátio ou Aprovação com Auditoria)
+export async function updateOrdemServicoStatus(
+  id: string,
+  newStatus: StatusOS,
+  dispositivoAudit?: string
+): Promise<boolean> {
   const aprovadoEm = newStatus === 'APROVADO' ? new Date().toISOString() : undefined;
+  const dispositivo = newStatus === 'APROVADO' ? (dispositivoAudit || detectarDispositivoCliente()) : undefined;
 
-  if (isSupabaseConfigured) {
-    try {
-      const payload: { status: StatusOS; aprovado_em?: string } = { status: newStatus };
-      if (aprovadoEm) payload.aprovado_em = aprovadoEm;
-
-      const { error } = await supabase
-        .from('ordens_servico')
-        .update(payload)
-        .eq('id', id);
-
-      if (!error) return true;
-    } catch (e) {
-      console.warn('Erro ao atualizar status no Supabase:', e);
-    }
-  }
-
-  // Fallback local
+  // Sempre registra nos dados locais de fallback/cache para exibição imediata
   const ordens = getLocalOrdens();
   const index = ordens.findIndex((os) => os.id === id);
   if (index !== -1) {
-    const updated = {
+    const updated: OrdemServico = {
       ...ordens[index],
       status: newStatus,
       aprovado_em: aprovadoEm || (newStatus === 'ORCAMENTO' ? null : ordens[index].aprovado_em),
+      aprovado_dispositivo: dispositivo || (newStatus === 'ORCAMENTO' ? null : ordens[index].aprovado_dispositivo),
     };
     ordens[index] = updated;
     saveLocalOrdens(ordens, updated);
-    return true;
   }
-  return false;
+
+  if (isSupabaseConfigured) {
+    try {
+      // Tenta gravar incluindo trilha de auditoria do dispositivo
+      const payloadWithAudit: Record<string, unknown> = { status: newStatus };
+      if (aprovadoEm) payloadWithAudit.aprovado_em = aprovadoEm;
+      if (dispositivo) payloadWithAudit.aprovado_dispositivo = dispositivo;
+
+      const { error } = await supabase
+        .from('ordens_servico')
+        .update(payloadWithAudit)
+        .eq('id', id);
+
+      if (!error) {
+        logEventoOS('INFO', 'status_os_atualizado', { id, status: newStatus, dispositivo });
+        return true;
+      }
+
+      // Fallback automático caso a coluna aprovado_dispositivo ainda não tenha sido criada no banco antigo
+      const payloadBasic: { status: StatusOS; aprovado_em?: string } = { status: newStatus };
+      if (aprovadoEm) payloadBasic.aprovado_em = aprovadoEm;
+
+      const { error: fallbackErr } = await supabase
+        .from('ordens_servico')
+        .update(payloadBasic)
+        .eq('id', id);
+
+      if (!fallbackErr) {
+        logEventoOS('INFO', 'status_os_atualizado_sem_coluna_audit', { id, status: newStatus });
+        return true;
+      }
+
+      logEventoOS('WARN', 'falha_atualizar_status_supabase', { id, erro: fallbackErr.message });
+    } catch (e) {
+      logEventoOS('ERROR', 'excecao_atualizar_status_supabase', { id, erro: String(e) });
+    }
+  }
+
+  return index !== -1;
 }
 
-// 7. Aprovar Orçamento (Ação pública do cliente)
-export async function aprovarOrçamento(id: string): Promise<boolean> {
-  return updateOrdemServicoStatus(id, 'APROVADO');
+// 7. Aprovar Orçamento (Ação pública do cliente com Trilha de Auditoria)
+export async function aprovarOrçamento(id: string): Promise<{
+  ok: boolean;
+  aprovado_em: string;
+  aprovado_dispositivo: string;
+  protocolo: string;
+}> {
+  const aprovado_em = new Date().toISOString();
+  const aprovado_dispositivo = detectarDispositivoCliente();
+  const protocolo = gerarHashAuditoria(id, aprovado_em);
+
+  // Caso exista a RPC blindada no Supabase, tenta usá-la primeiro; se não existir, usa o update padrão
+  if (isSupabaseConfigured) {
+    try {
+      const { error: rpcError } = await supabase.rpc('aprovar_orcamento_publico', {
+        p_os_id: id,
+        p_dispositivo: `${aprovado_dispositivo} [${protocolo}]`,
+      });
+      if (!rpcError) {
+        logEventoOS('INFO', 'orcamento_aprovado_via_rpc', { id, aprovado_dispositivo, protocolo });
+        await updateOrdemServicoStatus(id, 'APROVADO', `${aprovado_dispositivo} [${protocolo}]`);
+        return { ok: true, aprovado_em, aprovado_dispositivo, protocolo };
+      }
+    } catch {
+      // prossegue para update padrão se RPC não estiver instalada
+    }
+  }
+
+  const ok = await updateOrdemServicoStatus(id, 'APROVADO', `${aprovado_dispositivo} [${protocolo}]`);
+  logEventoOS('INFO', 'orcamento_aprovado_cliente', { id, ok, aprovado_dispositivo, protocolo });
+  return { ok, aprovado_em, aprovado_dispositivo, protocolo };
 }
 
 // 7. Configurar inscrição Realtime do Supabase + canal local de fallback

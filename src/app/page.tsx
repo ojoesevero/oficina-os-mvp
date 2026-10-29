@@ -77,7 +77,7 @@ export default function DashboardPage() {
       }
 
       if (updatedOS.status === 'APROVADO') {
-        setRealtimeNotification(`⚡ A OS ${updatedOS.codigo_curto || ''} foi APROVADA pelo cliente!`);
+        setRealtimeNotification(`A OS ${updatedOS.codigo_curto || ''} foi APROVADA pelo cliente!`);
         setTimeout(() => setRealtimeNotification(null), 6000);
       }
 
@@ -172,7 +172,7 @@ export default function DashboardPage() {
   const handleUpdateStatus = async (id: string, codigo: string, newStatus: StatusOS) => {
     const ok = await updateOrdemServicoStatus(id, newStatus);
     if (ok) {
-      setRealtimeNotification(`⚡ Status da OS ${codigo} alterado para "${newStatus}"!`);
+      setRealtimeNotification(`Status da OS ${codigo} alterado para "${newStatus}"!`);
       setTimeout(() => setRealtimeNotification(null), 4000);
     }
   };
@@ -265,19 +265,19 @@ export default function DashboardPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab('ALL')}
+              onClick={() => setActiveTab('ORCAMENTO')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
-                activeTab !== 'ALERTAS'
+                activeTab !== 'ALL' && activeTab !== 'ALERTAS'
                   ? 'bg-[#122030] text-emerald-400 font-bold border border-[#1e344d]'
                   : 'text-[#8b9eb0] hover:text-white hover:bg-[#111e2e]'
               }`}
             >
               <div className="flex items-center gap-3">
                 <Wrench className="w-4 h-4 flex-shrink-0" />
-                <span>Ordens de Serviço</span>
+                <span>Ordens em Aberto</span>
               </div>
               <span className="text-[11px] bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-full">
-                {countAll}
+                {countOpen}
               </span>
             </button>
 
@@ -434,7 +434,7 @@ export default function DashboardPage() {
                   className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 active:scale-95 transition-all text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-500/25 cursor-pointer"
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
-                  <span>+ Nova Ordem de Serviço</span>
+                  <span>Nova Ordem de Serviço</span>
                 </Link>
               </div>
             </div>

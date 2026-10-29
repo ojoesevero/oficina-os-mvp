@@ -73,17 +73,7 @@ Dono de oficina mecânica não tem paciência para apresentações de slides em 
 ### 💬 Script 2: Abordagem via WhatsApp (Prospecção Digital Local)
 *(Localize oficinas mecânicas no Google Maps da sua cidade com boas avaliações e mande para o WhatsApp comercial):*
 
-> *"Olá, equipe da [Nome da Oficina]! Tudo bem?*  
->  
-> *Notei que vocês são muito bem avaliados aqui em [Nome da Cidade/Bairro].*  
->  
-> *Nós desenvolvemos o **JS OrçaFácil**, uma ferramenta criada especialmente para oficinas mecânicas enviarem orçamentos profissionais direto no WhatsApp do cliente com:*  
->  
-> 📸 *Fotos da entrada do veículo (evita dores de cabeça com avarias).*  
-> ⚡ *Página limpa onde o cliente aprova o serviço com 1 toque no celular.*  
-> ⏱️ *Pátio atualizado em tempo real no computador ou celular da recepção.*  
-> 🔔 *Lembrete automático para trazer o cliente de volta após 6 meses (troca de óleo e revisão).*  
->  
+> *" 
 > *Gravei uma demonstração rápida de 45 segundos mostrando o sistema funcionando. Posso te enviar por aqui sem compromisso?"*
 
 ---
