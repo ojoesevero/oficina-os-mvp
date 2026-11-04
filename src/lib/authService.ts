@@ -1,35 +1,41 @@
 import { useSyncExternalStore } from 'react';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { Oficina } from '@/types/database';
-import { fetchOficinas } from './osService';
+import { fetchOficinas, logEventoOS } from './osService';
 
 const AUTH_STORAGE_KEY = 'oficina_os_current_auth_v1';
+
+// Permite demonstração e troca rápida de oficinas
+export const isDemoModeEnabled =
+  process.env.NODE_ENV === 'development' ||
+  !isSupabaseConfigured ||
+  process.env.NEXT_PUBLIC_ENABLE_DEMO !== 'false';
 
 export interface DemoAccount {
   email: string;
   nome: string;
-  senhaPadrao: string;
   oficinaId: string;
+  corPrimaria: string;
 }
 
 export const DEMO_ACCOUNTS: DemoAccount[] = [
   {
     email: 'lider@oficina.com',
     nome: 'AutoCenter Líder',
-    senhaPadrao: '123456',
     oficinaId: '11111111-1111-1111-1111-111111111111',
+    corPrimaria: '#22c55e',
   },
   {
     email: 'alemao@oficina.com',
     nome: 'Mecânica Alemão & Especialistas',
-    senhaPadrao: '123456',
     oficinaId: '22222222-2222-2222-2222-222222222222',
+    corPrimaria: '#f59e0b',
   },
   {
     email: 'cartech@oficina.com',
     nome: 'CarTech Performance',
-    senhaPadrao: '123456',
     oficinaId: '33333333-3333-3333-3333-333333333333',
+    corPrimaria: '#06b6d4',
   },
 ];
 
@@ -109,14 +115,75 @@ export function useIsHydrated(): boolean {
   );
 }
 
-// Realizar Login
+// Troca rápida entre oficinas na tela inicial ou login
+export async function loginDemoOficina(
+  demoEmailOrId: string
+): Promise<{ success: boolean; oficina?: Oficina; error?: string }> {
+  const cleanKey = demoEmailOrId.trim().toLowerCase();
+  const matchedDemo = DEMO_ACCOUNTS.find(
+    (acc) => acc.email.toLowerCase() === cleanKey || acc.oficinaId.toLowerCase() === cleanKey
+  );
+
+  const allOficinas = await fetchOficinas();
+  const oficinaFromList = allOficinas.find(
+    (of) =>
+      of.id.toLowerCase() === cleanKey ||
+      of.email?.toLowerCase() === cleanKey ||
+      (matchedDemo && of.id === matchedDemo.oficinaId)
+  );
+
+  const oficina: Oficina = oficinaFromList || (matchedDemo ? {
+    id: matchedDemo.oficinaId,
+    nome: matchedDemo.nome,
+    whatsapp: '5511999998888',
+    email: matchedDemo.email,
+    cor_primaria: matchedDemo.corPrimaria,
+    logo_url: null,
+  } : allOficinas[0]);
+
+  if (!oficina) {
+    return { success: false, error: 'Oficina não localizada.' };
+  }
+
+  setCurrentOficina(oficina);
+  logEventoOS('INFO', 'troca_oficina_ativa', { oficinaId: oficina.id, cor: oficina.cor_primaria });
+  return { success: true, oficina };
+}
+
+// Realizar Login Oficial
 export async function loginOficina(
   email: string,
   password: string
 ): Promise<{ success: boolean; oficina?: Oficina; error?: string }> {
   const cleanEmail = email.trim().toLowerCase();
+  const allOficinas = await fetchOficinas();
+  const foundOficina = allOficinas.find(
+    (of) => of.email?.toLowerCase() === cleanEmail
+  );
 
-  // 1. Tentar autenticação via Supabase se configurado
+  // Verificar se a oficina foi suspensa no Painel Master Admin
+  if (foundOficina && foundOficina.ativo === false) {
+    return {
+      success: false,
+      error: 'Acesso desta oficina está temporariamente suspenso. Entre em contato com a JoeSevero Tech.',
+    };
+  }
+
+  // 1. Verificar credencial configurada pelo Administrador no Painel Master (/admin)
+  if (foundOficina && foundOficina.senha_acesso) {
+    if (foundOficina.senha_acesso === password) {
+      setCurrentOficina(foundOficina);
+      logEventoOS('INFO', 'login_oficina_admin_credencial', { oficinaId: foundOficina.id });
+      return { success: true, oficina: foundOficina };
+    } else {
+      return {
+        success: false,
+        error: 'Senha incorreta para esta oficina. Verifique suas credenciais.',
+      };
+    }
+  }
+
+  // 2. Autenticação oficial via Supabase Auth quando configurado
   if (isSupabaseConfigured) {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -124,59 +191,92 @@ export async function loginOficina(
         password,
       });
 
-      if (!error && data.user) {
-        // Buscar dados da oficina vinculada ao usuário por user_id ou email
-        const { data: oficinaData } = await supabase
-          .from('oficinas')
-          .select('*')
-          .or(`user_id.eq.${data.user.id},email.eq.${cleanEmail}`)
-          .single();
-
-        if (oficinaData) {
-          const oficina = oficinaData as Oficina;
-          setCurrentOficina(oficina);
-          return { success: true, oficina };
-        }
+      if (!error && data.user && foundOficina) {
+        setCurrentOficina(foundOficina);
+        logEventoOS('INFO', 'login_producao_sucesso', { oficinaId: foundOficina.id });
+        return { success: true, oficina: foundOficina };
       }
     } catch (e) {
-      console.warn('Erro ao autenticar com Supabase Auth, tentando contas demo locais:', e);
+      logEventoOS('ERROR', 'erro_conexao_supabase_auth', { erro: String(e) });
     }
   }
 
-  // 2. Validação local com oficinas demo
-  const allOficinas = await fetchOficinas();
-  const matchedDemo = DEMO_ACCOUNTS.find((acc) => acc.email === cleanEmail);
-
-  if (matchedDemo) {
-    if (password !== matchedDemo.senhaPadrao) {
-      return { success: false, error: 'Senha incorreta para esta oficina.' };
-    }
-
-    const oficina = allOficinas.find((of) => of.id === matchedDemo.oficinaId) || {
-      id: matchedDemo.oficinaId,
-      nome: matchedDemo.nome,
-      whatsapp: '5511999998888',
-      email: matchedDemo.email,
-    };
-
-    setCurrentOficina(oficina);
-    return { success: true, oficina };
-  }
-
-  // Verificação direta por e-mail nas oficinas
-  const foundOficina = allOficinas.find(
-    (of) => of.email?.toLowerCase() === cleanEmail || of.nome.toLowerCase().includes(cleanEmail.split('@')[0])
-  );
-
-  if (foundOficina && password.length >= 4) {
+  // 3. Acesso para oficinas cadastradas sem senha customizada / modo demonstração
+  if (foundOficina && password.length >= 6) {
     setCurrentOficina(foundOficina);
+    logEventoOS('INFO', 'login_oficina_sucesso', { oficinaId: foundOficina.id });
     return { success: true, oficina: foundOficina };
+  }
+
+  if (isDemoModeEnabled) {
+    const matchedDemo = DEMO_ACCOUNTS.find((acc) => acc.email === cleanEmail);
+    if (matchedDemo && password.length >= 6) {
+      return loginDemoOficina(cleanEmail);
+    }
   }
 
   return {
     success: false,
-    error: 'Credenciais inválidas. Verifique o e-mail ou utilize uma das contas de teste.',
+    error: 'Credenciais inválidas. Verifique seu e-mail e senha de acesso.',
   };
+}
+
+// ============================================================================
+// AUTENTICAÇÃO EXCLUSIVA DO SUPER ADMIN (JOESEVERO TECH — /admin)
+// ============================================================================
+const ADMIN_AUTH_STORAGE_KEY = 'joesevero_super_admin_session_v1';
+const ADMIN_CONFIG_STORAGE_KEY = 'joesevero_super_admin_credentials_v1';
+
+export function getMasterAdminCredentials(): { email: string; pass: string } {
+  const defaultEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'admin@joeseverotech.com').toLowerCase();
+  const defaultPass = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin123';
+
+  if (typeof window === 'undefined') {
+    return { email: defaultEmail, pass: defaultPass };
+  }
+  try {
+    const saved = localStorage.getItem(ADMIN_CONFIG_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.email && parsed.pass) {
+        return { email: parsed.email.toLowerCase(), pass: parsed.pass };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return { email: defaultEmail, pass: defaultPass };
+}
+
+export function updateMasterAdminCredentials(email: string, pass: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(
+    ADMIN_CONFIG_STORAGE_KEY,
+    JSON.stringify({ email: email.trim().toLowerCase(), pass })
+  );
+}
+
+export function isSuperAdminAuthenticated(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === 'true';
+}
+
+export function loginSuperAdmin(email: string, password: string): boolean {
+  const creds = getMasterAdminCredentials();
+  if (email.trim().toLowerCase() === creds.email && password === creds.pass) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(ADMIN_AUTH_STORAGE_KEY, 'true');
+    }
+    logEventoOS('INFO', 'super_admin_login_sucesso', { email: creds.email });
+    return true;
+  }
+  return false;
+}
+
+export function logoutSuperAdmin(): void {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
+  }
 }
 
 // Realizar Logout

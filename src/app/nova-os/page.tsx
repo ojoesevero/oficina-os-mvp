@@ -18,8 +18,8 @@ import {
   Car,
   User
 } from 'lucide-react';
-import { uploadFotoOS, createOrdemServico, generateWhatsAppLinkParaCliente } from '@/lib/osService';
-import { useCurrentOficina, useIsHydrated } from '@/lib/authService';
+import { uploadFotoOS, createOrdemServico, generateWhatsAppLinkParaCliente, fetchOficinas } from '@/lib/osService';
+import { useCurrentOficina, useIsHydrated, setCurrentOficina } from '@/lib/authService';
 import { maskPlaca, unmaskPlaca, maskPhone, unmaskPhone, maskKM, unmaskKM } from '@/utils/masks';
 import PitTrackLogo from '@/components/PitTrackLogo';
 
@@ -33,9 +33,9 @@ const SUGESTOES_RAPIDAS = [
   { tipo: 'PECA' as const, descricao: 'Óleo Motor 5W30 Sintético (4L)', valor: 260 },
   { tipo: 'PECA' as const, descricao: 'Filtro de Óleo + Filtro de Combustível', valor: 95 },
   { tipo: 'PECA' as const, descricao: 'Jogo de Pastilhas de Freio Dianteiras', valor: 280 },
-  { tipo: 'MAO_DE_OBRA' as const, descricao: 'Revisão Básica e Troca de Filtros', valor: 150 },
-  { tipo: 'MAO_DE_OBRA' as const, descricao: 'Alinhamento 3D + Balanceamento 4 Rodas', valor: 140 },
-  { tipo: 'MAO_DE_OBRA' as const, descricao: 'Mão de Obra Freios Dianteiros e Sangria', valor: 220 },
+  { tipo: 'MAO_DE_OBRA' as const, descricao: 'Serviço Técnico: Revisão Básica e Troca de Filtros', valor: 150 },
+  { tipo: 'MAO_DE_OBRA' as const, descricao: 'Serviço Técnico: Alinhamento 3D + Balanceamento 4 Rodas', valor: 140 },
+  { tipo: 'MAO_DE_OBRA' as const, descricao: 'Serviço Técnico: Freios Dianteiros e Sangria', valor: 220 },
 ];
 
 export default function NovaOSPage() {
@@ -45,6 +45,7 @@ export default function NovaOSPage() {
   // Estados Reativos de Autenticação e Oficina
   const currentOficina = useCurrentOficina();
   const isHydrated = useIsHydrated();
+  const brandColor = currentOficina?.cor_primaria || '#22c55e';
 
   // Dados do Veículo e Cliente
   const [veiculoPlaca, setVeiculoPlaca] = useState('');
@@ -60,7 +61,7 @@ export default function NovaOSPage() {
   // Itens da OS
   const [itens, setItens] = useState<ItemForm[]>([
     { tipo: 'PECA', descricao: 'Óleo Sintético 5W30 + Filtro', valor: 280 },
-    { tipo: 'MAO_DE_OBRA', descricao: 'Mão de Obra de Troca e Check-up 20 Itens', valor: 150 }
+    { tipo: 'MAO_DE_OBRA', descricao: 'Serviço Técnico: Troca e Check-up 20 Itens', valor: 150 }
   ]);
 
   // Novo item em edição
@@ -73,12 +74,26 @@ export default function NovaOSPage() {
   const [createdOSData, setCreatedOSData] = useState<{ id: string; codigo_curto: string; whatsAppLink: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Verificar sessão da oficina sem setState cascading
+  // Verificar sessão da oficina sem setState cascading e sincronizar catálogo do Admin
   useEffect(() => {
     if (isHydrated && !currentOficina) {
       router.replace('/login?returnTo=/nova-os');
+      return;
+    }
+    if (isHydrated && currentOficina) {
+      fetchOficinas().then((lista) => {
+        const atualizada = lista.find((o) => o.id === currentOficina.id);
+        if (atualizada && JSON.stringify(atualizada) !== JSON.stringify(currentOficina)) {
+          setCurrentOficina(atualizada);
+        }
+      });
     }
   }, [isHydrated, currentOficina, router]);
+
+  const catalogoOficina =
+    currentOficina?.servicos_rapidos && currentOficina.servicos_rapidos.length > 0
+      ? currentOficina.servicos_rapidos
+      : SUGESTOES_RAPIDAS;
 
   // Calcular valor total dinâmico
   const valorTotal = itens.reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
@@ -259,7 +274,13 @@ export default function NovaOSPage() {
             <span>Voltar ao Pátio</span>
           </button>
           
-          <PitTrackLogo size="sm" showSubtitle={false} />
+          <PitTrackLogo
+            size="sm"
+            showSubtitle={false}
+            logoUrl={currentOficina.logo_url}
+            corPrimaria={brandColor}
+            nomeOficina={currentOficina.nome}
+          />
         </div>
       </header>
 
@@ -473,22 +494,22 @@ export default function NovaOSPage() {
               </span>
             </div>
 
-            {/* Sugestões Rápidas */}
+            {/* Sugestões Rápidas do Catálogo da Oficina */}
             <div>
               <span className="text-[10px] uppercase font-bold text-[#5c7287] mb-1.5 block">
-                Atalhos Rápidos:
+                Catálogo Rápido da Oficina:
               </span>
               <div className="flex flex-wrap gap-1.5">
-                {SUGESTOES_RAPIDAS.map((sug, i) => (
+                {catalogoOficina.map((sug, i) => (
                   <button
                     key={i}
                     type="button"
                     onClick={() => handleAddSugestao(sug)}
                     className="text-[10px] bg-[#080d14] border border-[#1c2e42] hover:border-emerald-500/50 text-[#8b9eb0] hover:text-white px-2 py-1 rounded-lg flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
                   >
-                    <Plus className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                    <Plus className="w-3 h-3 flex-shrink-0" style={{ color: brandColor }} />
                     <span>{sug.descricao}</span>
-                    <span className="text-emerald-400 font-bold font-mono">R${sug.valor}</span>
+                    <span className="font-bold font-mono" style={{ color: brandColor }}>R${sug.valor}</span>
                   </button>
                 ))}
               </div>
@@ -500,9 +521,10 @@ export default function NovaOSPage() {
                 <button
                   type="button"
                   onClick={() => setNovoTipo('PECA')}
+                  style={novoTipo === 'PECA' ? { backgroundColor: brandColor } : undefined}
                   className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     novoTipo === 'PECA'
-                      ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                      ? 'text-slate-950 shadow-sm'
                       : 'text-[#8b9eb0] hover:text-white'
                   }`}
                 >
@@ -512,14 +534,15 @@ export default function NovaOSPage() {
                 <button
                   type="button"
                   onClick={() => setNovoTipo('MAO_DE_OBRA')}
+                  style={novoTipo === 'MAO_DE_OBRA' ? { backgroundColor: brandColor } : undefined}
                   className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     novoTipo === 'MAO_DE_OBRA'
-                      ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                      ? 'text-slate-950 shadow-sm'
                       : 'text-[#8b9eb0] hover:text-white'
                   }`}
                 >
                   <Wrench className="w-3.5 h-3.5" />
-                  <span>Mão de Obra</span>
+                  <span>Serviço Técnico</span>
                 </button>
               </div>
 
@@ -558,8 +581,15 @@ export default function NovaOSPage() {
                   className="bg-[#080d14] border border-[#1c2e42] p-2.5 rounded-xl flex items-center justify-between text-xs"
                 >
                   <div className="flex items-center gap-2 min-w-0 pr-2">
-                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex-shrink-0">
-                      {it.tipo === 'PECA' ? 'Peça' : 'Serviço'}
+                    <span
+                      style={{
+                        backgroundColor: `${brandColor}18`,
+                        color: brandColor,
+                        borderColor: `${brandColor}35`,
+                      }}
+                      className="text-[10px] font-bold px-1.5 py-0.2 rounded border flex-shrink-0"
+                    >
+                      {it.tipo === 'PECA' ? 'Peça' : 'Serviço Técnico'}
                     </span>
                     <span className="text-slate-200 truncate">{it.descricao}</span>
                   </div>
@@ -580,22 +610,23 @@ export default function NovaOSPage() {
               ))}
             </div>
 
-            {/* Totalizador Estilo PitTrack */}
+            {/* Totalizador com a Cor da Oficina */}
             <div className="bg-[#091018] rounded-xl p-3 border border-[#1c2e42] flex items-center justify-between">
               <span className="text-xs uppercase font-extrabold text-[#8b9eb0] tracking-wider">
                 Valor Total Estimado
               </span>
-              <span className="text-xl font-black text-emerald-400 font-mono">
+              <span style={{ color: brandColor }} className="text-xl font-black font-mono">
                 R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </span>
             </div>
           </div>
 
-          {/* Botão de Envio (Vibrante Verde Neon) */}
+          {/* Botão de Envio (Com a Cor Padrão da Oficina) */}
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 active:scale-98 disabled:opacity-50 text-slate-950 font-black text-sm py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/30 transition-all uppercase tracking-wide cursor-pointer"
+            style={{ backgroundColor: brandColor }}
+            className="w-full flex items-center justify-center gap-2 hover:opacity-90 active:scale-98 disabled:opacity-50 text-slate-950 font-black text-sm py-4 px-4 rounded-2xl shadow-xl transition-all uppercase tracking-wide cursor-pointer"
           >
             {isSubmitting ? (
               <>

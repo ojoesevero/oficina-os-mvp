@@ -1,6 +1,6 @@
-# 💼 Plano de Ação Comercial e Estratégia de Vendas — JS OrçaFácil
+# 💼 Plano de Ação Comercial e Estratégia de Vendas — JS OrçaFácil (by JoeSevero Tech)
 
-> **Manual de Vendas, Prospecção e Precificação para Sistemas de Gestão Ágil de Oficinas Mecânicas e Centros Automotivos**  
+> **Manual de Vendas, Prospecção e Precificação — Produto: JS OrçaFácil | Fornecedor: JoeSevero Tech**  
 > *Transforme oficinas mecânicas do papel, da prancheta e das mensagens desorganizadas em negócios ágeis com orçamentos aprovados em 1 clique no WhatsApp.*
 
 ---
@@ -73,7 +73,8 @@ Dono de oficina mecânica não tem paciência para apresentações de slides em 
 ### 💬 Script 2: Abordagem via WhatsApp (Prospecção Digital Local)
 *(Localize oficinas mecânicas no Google Maps da sua cidade com boas avaliações e mande para o WhatsApp comercial):*
 
-> *" 
+> *"Olá, pessoal da [Nome da Oficina]! Tudo bem? Aqui é da **JoeSevero Tech**.*  
+> *Nós desenvolvemos o **JS OrçaFácil**, um sistema prático para oficinas mecânicas enviarem orçamentos com fotos de check-in e aprovação em 1 clique direto no WhatsApp do cliente.*  
 > *Gravei uma demonstração rápida de 45 segundos mostrando o sistema funcionando. Posso te enviar por aqui sem compromisso?"*
 
 ---
@@ -152,5 +153,6 @@ Após o cliente aceitar o teste ou fechar o contrato, execute o processo rápido
 
 - 🗺️ **Rota de Visitas em Campo (Canoas/RS):** [`ROTA_DE_VISITAS_CANOAS.md`](./ROTA_DE_VISITAS_CANOAS.md)  
 - 📋 **Guia de Pré-Requisitos para Oficinas:** [`PRE_REQUISITOS_IMPLANTACAO.md`](./PRE_REQUISITOS_IMPLANTACAO.md)  
+- ⚖️ **Termos de Uso, LGPD, NFS-e e Contrato SaaS:** [`TERMOS_LGPD_CONTRATO.md`](./TERMOS_LGPD_CONTRATO.md)  
 - 🛠️ **Relatório Técnico & Testes:** [`RELATORIO_AUDITORIA.md`](./RELATORIO_AUDITORIA.md)  
 - 📖 **Manual Técnico e Arquitetura do Sistema:** [`README.md`](./README.md)

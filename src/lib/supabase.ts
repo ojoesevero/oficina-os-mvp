@@ -24,25 +24,63 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-// Dados mockados iniciais realistas para o Modo Demo (armazenados também em localStorage quando offline/demo)
+// Dados mockados iniciais realistas para o Modo Demo (cada oficina com sua cor padrão individual, catálogo de serviços e suporte a logo próprio)
 export const DEMO_OFICINAS: Oficina[] = [
   {
     id: '11111111-1111-1111-1111-111111111111',
     nome: 'AutoCenter Líder - Centro Automotivo',
     whatsapp: '5511999998888',
     email: 'lider@oficina.com',
+    cnpj_cpf: '12.345.678/0001-90',
+    endereco: 'Av. dos Bandeirantes, 1450 - São Paulo/SP',
+    cor_primaria: '#22c55e', // Verde Esmeralda
+    logo_url: null,
+    plano: 'PRO',
+    ativo: true,
+    servicos_rapidos: [
+      { tipo: 'PECA', descricao: 'Óleo Motor 5W30 Sintético (4L)', valor: 260 },
+      { tipo: 'PECA', descricao: 'Filtro de Óleo + Filtro de Combustível', valor: 95 },
+      { tipo: 'PECA', descricao: 'Jogo de Pastilhas de Freio Dianteiras', valor: 280 },
+      { tipo: 'MAO_DE_OBRA', descricao: 'Serviço Técnico: Revisão Básica e Troca de Filtros', valor: 150 },
+      { tipo: 'MAO_DE_OBRA', descricao: 'Serviço Técnico: Alinhamento 3D + Balanceamento 4 Rodas', valor: 140 },
+      { tipo: 'MAO_DE_OBRA', descricao: 'Serviço Técnico: Freios Dianteiros e Sangria', valor: 220 },
+    ],
   },
   {
     id: '22222222-2222-2222-2222-222222222222',
     nome: 'Oficina Mecânica Alemão & Especialistas',
     whatsapp: '5511988887777',
     email: 'alemao@oficina.com',
+    cnpj_cpf: '28.901.234/0001-15',
+    endereco: 'Rua Guaicurus, 820 - Lapa, São Paulo/SP',
+    cor_primaria: '#f59e0b', // Âmbar / Ouro Industrial
+    logo_url: null,
+    plano: 'PRO',
+    ativo: true,
+    servicos_rapidos: [
+      { tipo: 'PECA', descricao: 'Kit Correia Dentada + Tensor Original', valor: 560 },
+      { tipo: 'PECA', descricao: 'Aditivo Radiador Orgânico Concentrado', valor: 85 },
+      { tipo: 'MAO_DE_OBRA', descricao: 'Serviço Técnico: Substituição Correia Dentada e Sincronismo', valor: 380 },
+      { tipo: 'MAO_DE_OBRA', descricao: 'Serviço Técnico: Limpeza Sistema de Arrefecimento', valor: 180 },
+    ],
   },
   {
     id: '33333333-3333-3333-3333-333333333333',
     nome: 'CarTech Performance & Injeção Eletrônica',
     whatsapp: '5511977776666',
     email: 'cartech@oficina.com',
+    cnpj_cpf: '41.555.890/0001-42',
+    endereco: 'Av. Europa, 510 - Jardins, São Paulo/SP',
+    cor_primaria: '#06b6d4', // Azul Ciano Performance
+    logo_url: null,
+    plano: 'MULTI',
+    ativo: true,
+    servicos_rapidos: [
+      { tipo: 'PECA', descricao: 'Jogo de 4 Velas de Ignição Iridium NGK', valor: 680 },
+      { tipo: 'PECA', descricao: 'Fluido de Freio Racing Motul RBF 660', valor: 190 },
+      { tipo: 'MAO_DE_OBRA', descricao: 'Serviço Técnico: Diagnóstico Scanner Avançado + Injeção', valor: 250 },
+      { tipo: 'MAO_DE_OBRA', descricao: 'Serviço Técnico: Limpeza e Equalização de Bicos Injetores', valor: 220 },
+    ],
   },
 ];
 
@@ -117,7 +155,7 @@ export const DEMO_ORDENS_SERVICO: OrdemServico[] = [
     status: 'FINALIZADO',
     valor_total: 620.00,
     aprovado_em: '2026-04-10T16:00:00.000Z',
-    data_proximo_retorno: '2026-10-10', // Venceu há 10 dias!
+    data_proximo_retorno: '2026-10-10',
     created_at: '2026-04-10T15:00:00.000Z',
   },
   {
@@ -133,7 +171,7 @@ export const DEMO_ORDENS_SERVICO: OrdemServico[] = [
     status: 'FINALIZADO',
     valor_total: 1350.00,
     aprovado_em: '2026-04-27T10:00:00.000Z',
-    data_proximo_retorno: '2026-10-27', // Vence em 7 dias!
+    data_proximo_retorno: '2026-10-27',
     created_at: '2026-04-27T09:00:00.000Z',
   },
   {
@@ -146,12 +184,30 @@ export const DEMO_ORDENS_SERVICO: OrdemServico[] = [
     veiculo_modelo: 'Volkswagen Gol 1.6 MSI',
     km_atual: 89000,
     fotos_entrada: [],
-    status: 'ORCAMENTO',
+    status: 'APROVADO',
     valor_total: 940.00,
-    aprovado_em: null,
+    aprovado_em: '2026-10-20T10:00:00.000Z',
     data_proximo_retorno: '2026-10-27',
     created_at: '2026-10-20T08:00:00.000Z',
-  }
+  },
+  {
+    id: 'a1b2c3d4-0007-4000-8000-000000000007',
+    codigo_curto: 'OS-9204',
+    oficina_id: '33333333-3333-3333-3333-333333333333',
+    cliente_nome: 'Lucas Tavares Martins',
+    cliente_whatsapp: '5511974445566',
+    veiculo_placa: 'CTK3F91',
+    veiculo_modelo: 'Audi A3 Sedan 2.0 TFSI',
+    km_atual: 54100,
+    fotos_entrada: [
+      'https://images.unsplash.com/photo-1603584173870-7f23fdae1b7a?auto=format&fit=crop&w=800&q=80'
+    ],
+    status: 'APROVADO',
+    valor_total: 1850.00,
+    aprovado_em: '2026-10-21T14:10:00.000Z',
+    data_proximo_retorno: '2027-04-21',
+    created_at: '2026-10-21T11:30:00.000Z',
+  },
 ];
 
 export const DEMO_ITENS_OS: ItemOS[] = [
@@ -181,7 +237,7 @@ export const DEMO_ITENS_OS: ItemOS[] = [
     id: 'item-104',
     os_id: 'a1b2c3d4-0001-4000-8000-000000000001',
     tipo: 'MAO_DE_OBRA',
-    descricao: 'Mão de Obra: Substituição Discos, Pastilhas e Sangria Completa',
+    descricao: 'Serviço Técnico: Substituição Discos, Pastilhas e Sangria Completa',
     valor: 350.00,
   },
   // Para OS-8492 (Corolla)
@@ -203,7 +259,7 @@ export const DEMO_ITENS_OS: ItemOS[] = [
     id: 'item-203',
     os_id: 'a1b2c3d4-0002-4000-8000-000000000002',
     tipo: 'MAO_DE_OBRA',
-    descricao: 'Mão de Obra: Troca de Amortecedores + Alinhamento Computadorizado 3D',
+    descricao: 'Serviço Técnico: Troca de Amortecedores + Alinhamento Computadorizado 3D',
     valor: 850.00,
   },
   // Para OS-7910 (Retorno)
@@ -225,7 +281,37 @@ export const DEMO_ITENS_OS: ItemOS[] = [
     id: 'item-403',
     os_id: 'a1b2c3d4-0004-4000-8000-000000000004',
     tipo: 'MAO_DE_OBRA',
-    descricao: 'Revisão Preventiva e Troca de Filtros e Lubrificantes',
+    descricao: 'Serviço Técnico: Revisão Preventiva e Troca de Filtros',
     valor: 180.00,
+  },
+  // Para OS-8102 (Oficina Alemão)
+  {
+    id: 'item-601',
+    os_id: 'a1b2c3d4-0006-4000-8000-000000000006',
+    tipo: 'PECA',
+    descricao: 'Kit Correia Dentada + Tensor Original VW',
+    valor: 560.00,
+  },
+  {
+    id: 'item-602',
+    os_id: 'a1b2c3d4-0006-4000-8000-000000000006',
+    tipo: 'MAO_DE_OBRA',
+    descricao: 'Serviço Técnico: Substituição do Kit de Distribuição e Sincronismo',
+    valor: 380.00,
+  },
+  // Para OS-9204 (CarTech Performance)
+  {
+    id: 'item-701',
+    os_id: 'a1b2c3d4-0007-4000-8000-000000000007',
+    tipo: 'PECA',
+    descricao: 'Jogo de 4 Velas de Ignição Iridium NGK Laser',
+    valor: 980.00,
+  },
+  {
+    id: 'item-702',
+    os_id: 'a1b2c3d4-0007-4000-8000-000000000007',
+    tipo: 'MAO_DE_OBRA',
+    descricao: 'Serviço Técnico: Diagnóstico via Scanner + Limpeza de Bicos Injetores',
+    valor: 870.00,
   },
 ];

@@ -1,9 +1,76 @@
 import { supabase, isSupabaseConfigured, DEMO_OFICINAS, DEMO_ORDENS_SERVICO, DEMO_ITENS_OS } from './supabase';
-import { Oficina, OrdemServico, ItemOS, StatusOS } from '@/types/database';
+import { Oficina, OrdemServico, ItemOS, StatusOS, ServicoCatalogo, PlanoSaaS } from '@/types/database';
 
 const STORAGE_KEY_OS = 'oficina_os_items_data_v1';
 const STORAGE_KEY_ITEMS = 'oficina_os_itens_list_v1';
 const STORAGE_KEY_OFICINAS = 'oficina_os_oficinas_v1';
+const STORAGE_KEY_BRANDING = 'oficina_os_branding_v1';
+const STORAGE_KEY_DELETED_OFICINAS = 'oficina_os_deleted_oficinas_v1';
+
+function getDeletedOficinaIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DELETED_OFICINAS);
+    const arr: string[] = raw ? JSON.parse(raw) : [];
+    return new Set(arr);
+  } catch {
+    return new Set();
+  }
+}
+
+function markOficinaAsDeleted(oficinaId: string): void {
+  if (typeof window === 'undefined') return;
+  const set = getDeletedOficinaIds();
+  set.add(oficinaId);
+  localStorage.setItem(STORAGE_KEY_DELETED_OFICINAS, JSON.stringify(Array.from(set)));
+}
+
+// Paleta de cores padrão por oficina
+const DEFAULT_COLORS_BY_ID: Record<string, string> = {
+  '11111111-1111-1111-1111-111111111111': '#22c55e', // Verde Esmeralda (Líder)
+  '22222222-2222-2222-2222-222222222222': '#f59e0b', // Âmbar Industrial (Alemão)
+  '33333333-3333-3333-3333-333333333333': '#06b6d4', // Azul Ciano (CarTech)
+};
+
+function getLocalBrandingMap(): Record<string, Partial<Oficina>> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_BRANDING);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function applyBrandingToOficina(oficina: Oficina): Oficina {
+  const map = getLocalBrandingMap();
+  const custom = map[oficina.id];
+  const demoDefault = DEMO_OFICINAS.find((d) => d.id === oficina.id);
+
+  return {
+    ...demoDefault,
+    ...oficina,
+    ...custom,
+    nome: custom?.nome || oficina.nome,
+    email: custom?.email || oficina.email || demoDefault?.email,
+    whatsapp: custom?.whatsapp || oficina.whatsapp || demoDefault?.whatsapp || '',
+    cnpj_cpf: custom?.cnpj_cpf !== undefined ? custom.cnpj_cpf : (oficina.cnpj_cpf ?? demoDefault?.cnpj_cpf ?? null),
+    endereco: custom?.endereco !== undefined ? custom.endereco : (oficina.endereco ?? demoDefault?.endereco ?? null),
+    plano: custom?.plano || oficina.plano || demoDefault?.plano || 'PRO',
+    ativo: custom?.ativo !== undefined ? custom.ativo : (oficina.ativo !== undefined ? oficina.ativo : true),
+    logo_url: custom?.logo_url !== undefined ? custom.logo_url : (oficina.logo_url ?? null),
+    cor_primaria:
+      custom?.cor_primaria ||
+      oficina.cor_primaria ||
+      DEFAULT_COLORS_BY_ID[oficina.id] ||
+      '#22c55e',
+    servicos_rapidos:
+      custom?.servicos_rapidos ||
+      (Array.isArray(oficina.servicos_rapidos) && oficina.servicos_rapidos.length > 0
+        ? oficina.servicos_rapidos
+        : demoDefault?.servicos_rapidos || []),
+  };
+}
 
 // Gerador confiável de UUID v4 para compatibilidade total com tipos PostgreSQL UUID
 export function generateUUID(): string {
@@ -75,19 +142,242 @@ function saveLocalItens(itens: ItemOS[]) {
   }
 }
 
-// 1. Obter todas as oficinas cadastradas
+// 1. Obter todas as oficinas cadastradas (mesclando Supabase + cadastros/edições locais do Admin e respeitando exclusões)
 export async function fetchOficinas(): Promise<Oficina[]> {
+  const deletedIds = getDeletedOficinaIds();
+  const locais = getLocalOficinas().filter((o) => !deletedIds.has(o.id));
+
   if (isSupabaseConfigured) {
     try {
       const { data, error } = await supabase.from('oficinas').select('*').order('nome');
       if (!error && data && data.length > 0) {
-        return data as Oficina[];
+        const dbList = (data as Oficina[])
+          .filter((o) => !deletedIds.has(o.id))
+          .map(applyBrandingToOficina);
+        const dbIds = new Set(dbList.map((o) => o.id));
+        const extrasLocais = locais.filter((o) => !dbIds.has(o.id)).map(applyBrandingToOficina);
+        return [...dbList, ...extrasLocais];
       }
     } catch (e) {
       console.warn('Erro ao buscar oficinas no Supabase, usando dados locais:', e);
     }
   }
-  return getLocalOficinas();
+  return locais.map(applyBrandingToOficina);
+}
+
+// 1.1 Atualizar Logotipo Individual, Cor Padrão e Dados da Oficina
+export async function updateOficinaBranding(
+  oficinaId: string,
+  updates: Partial<Oficina>
+): Promise<Oficina | null> {
+  if (typeof window !== 'undefined') {
+    const map = getLocalBrandingMap();
+    map[oficinaId] = {
+      ...map[oficinaId],
+      ...updates,
+    };
+    localStorage.setItem(STORAGE_KEY_BRANDING, JSON.stringify(map));
+
+    const locais = getLocalOficinas();
+    const idx = locais.findIndex((o) => o.id === oficinaId);
+    if (idx !== -1) {
+      locais[idx] = { ...locais[idx], ...updates };
+      localStorage.setItem(STORAGE_KEY_OFICINAS, JSON.stringify(locais));
+    }
+  }
+
+  if (isSupabaseConfigured) {
+    try {
+      const fullPayload: Record<string, unknown> = {};
+      if (updates.nome !== undefined) fullPayload.nome = updates.nome;
+      if (updates.whatsapp !== undefined) fullPayload.whatsapp = updates.whatsapp;
+      if (updates.email !== undefined) fullPayload.email = updates.email;
+      if (updates.cnpj_cpf !== undefined) fullPayload.cnpj_cpf = updates.cnpj_cpf;
+      if (updates.endereco !== undefined) fullPayload.endereco = updates.endereco;
+      if (updates.logo_url !== undefined) fullPayload.logo_url = updates.logo_url;
+      if (updates.cor_primaria !== undefined) fullPayload.cor_primaria = updates.cor_primaria;
+      if (updates.plano !== undefined) fullPayload.plano = updates.plano;
+      if (updates.ativo !== undefined) fullPayload.ativo = updates.ativo;
+      if (updates.servicos_rapidos !== undefined) fullPayload.servicos_rapidos = updates.servicos_rapidos;
+
+      const { error } = await supabase.from('oficinas').update(fullPayload).eq('id', oficinaId);
+      if (error) {
+        // Fallback caso alguma coluna nova ainda não tenha sido migrada no banco
+        await supabase
+          .from('oficinas')
+          .update({
+            ...(updates.nome ? { nome: updates.nome } : {}),
+            ...(updates.whatsapp ? { whatsapp: updates.whatsapp } : {}),
+          })
+          .eq('id', oficinaId);
+      }
+    } catch (e) {
+      logEventoOS('WARN', 'aviso_update_branding_supabase', { oficinaId, erro: String(e) });
+    }
+  }
+
+  const todas = await fetchOficinas();
+  return todas.find((o) => o.id === oficinaId) || null;
+}
+
+// 1.2 [SUPER ADMIN] Cadastrar Nova Oficina ou Editar Oficina Existente
+export interface AdminOficinaInput {
+  id?: string;
+  nome: string;
+  email: string;
+  senha_acesso?: string;
+  whatsapp: string;
+  cnpj_cpf?: string;
+  endereco?: string;
+  logo_url?: string | null;
+  cor_primaria?: string;
+  plano?: PlanoSaaS;
+  ativo?: boolean;
+  servicos_rapidos?: ServicoCatalogo[];
+}
+
+export async function saveOficinaAdmin(input: AdminOficinaInput): Promise<Oficina> {
+  const isEditing = Boolean(input.id);
+  const targetId = input.id || generateUUID();
+
+  const defaultCatalogo: ServicoCatalogo[] = [
+    { tipo: 'PECA', descricao: 'Óleo Motor 5W30 Sintético (4L)', valor: 260 },
+    { tipo: 'PECA', descricao: 'Filtro de Óleo + Filtro de Combustível', valor: 95 },
+    { tipo: 'MAO_DE_OBRA', descricao: 'Serviço Técnico: Revisão Básica e Troca de Filtros', valor: 150 },
+    { tipo: 'MAO_DE_OBRA', descricao: 'Serviço Técnico: Diagnóstico Eletrônico Scanner', valor: 120 },
+  ];
+
+  const record: Oficina = {
+    id: targetId,
+    nome: input.nome.trim(),
+    email: input.email.trim().toLowerCase(),
+    ...(input.senha_acesso ? { senha_acesso: input.senha_acesso } : {}),
+    whatsapp: input.whatsapp.replace(/\D/g, ''),
+    cnpj_cpf: input.cnpj_cpf?.trim() || null,
+    endereco: input.endereco?.trim() || null,
+    logo_url: input.logo_url ?? null,
+    cor_primaria: input.cor_primaria || '#22c55e',
+    plano: input.plano || 'PRO',
+    ativo: input.ativo !== undefined ? input.ativo : true,
+    servicos_rapidos: input.servicos_rapidos || defaultCatalogo,
+    created_at: new Date().toISOString(),
+  };
+
+  if (typeof window !== 'undefined') {
+    const locais = getLocalOficinas();
+    const idx = locais.findIndex((o) => o.id === targetId);
+    if (idx !== -1) {
+      locais[idx] = {
+        ...locais[idx],
+        ...record,
+        senha_acesso: input.senha_acesso || locais[idx].senha_acesso,
+      };
+    } else {
+      locais.push(record);
+    }
+    localStorage.setItem(STORAGE_KEY_OFICINAS, JSON.stringify(locais));
+
+    const map = getLocalBrandingMap();
+    map[targetId] = {
+      ...map[targetId],
+      ...record,
+      senha_acesso: input.senha_acesso || map[targetId]?.senha_acesso,
+    };
+    localStorage.setItem(STORAGE_KEY_BRANDING, JSON.stringify(map));
+  }
+
+  if (isSupabaseConfigured) {
+    try {
+      if (isEditing) {
+        await updateOficinaBranding(targetId, record);
+      } else {
+        const { error } = await supabase.from('oficinas').insert({
+          id: record.id,
+          nome: record.nome,
+          email: record.email,
+          whatsapp: record.whatsapp,
+          cnpj_cpf: record.cnpj_cpf,
+          endereco: record.endereco,
+          logo_url: record.logo_url,
+          cor_primaria: record.cor_primaria,
+          plano: record.plano,
+          ativo: record.ativo,
+          servicos_rapidos: record.servicos_rapidos,
+        });
+        if (error) {
+          // Fallback caso banco tenha apenas colunas originais
+          await supabase.from('oficinas').insert({
+            id: record.id,
+            nome: record.nome,
+            whatsapp: record.whatsapp,
+          });
+        }
+      }
+      logEventoOS('INFO', isEditing ? 'admin_oficina_atualizada' : 'admin_oficina_criada', {
+        oficinaId: record.id,
+        nome: record.nome,
+      });
+    } catch (e) {
+      logEventoOS('WARN', 'aviso_salvar_oficina_admin_supabase', { erro: String(e) });
+    }
+  }
+
+  return applyBrandingToOficina(record);
+}
+
+// 1.3 [SUPER ADMIN] Atualizar catálogo de Serviços Técnicos e Peças de uma oficina
+export async function updateServicosOficinaAdmin(
+  oficinaId: string,
+  servicos: ServicoCatalogo[]
+): Promise<Oficina | null> {
+  return updateOficinaBranding(oficinaId, { servicos_rapidos: servicos });
+}
+
+// 1.4 [SUPER ADMIN] Excluir Oficina (Manutenção com cascata e bloqueio permanente de retorno)
+export async function deleteOficinaAdmin(oficinaId: string): Promise<boolean> {
+  // 1. Registra a exclusão permanentemente para que não retorne mesmo se houver seed no banco
+  markOficinaAsDeleted(oficinaId);
+
+  if (typeof window !== 'undefined') {
+    const locais = getLocalOficinas().filter((o) => o.id !== oficinaId);
+    localStorage.setItem(STORAGE_KEY_OFICINAS, JSON.stringify(locais));
+
+    // Remove ordens e itens vinculados localmente
+    const ordensDaOficina = getLocalOrdens().filter((os) => os.oficina_id === oficinaId);
+    const osIdsRemovidos = new Set(ordensDaOficina.map((os) => os.id));
+    const ordensRestantes = getLocalOrdens().filter((os) => os.oficina_id !== oficinaId);
+    saveLocalOrdens(ordensRestantes);
+
+    const itensRestantes = getLocalItens().filter((it) => !osIdsRemovidos.has(it.os_id));
+    saveLocalItens(itensRestantes);
+
+    const map = getLocalBrandingMap();
+    delete map[oficinaId];
+    localStorage.setItem(STORAGE_KEY_BRANDING, JSON.stringify(map));
+  }
+
+  if (isSupabaseConfigured) {
+    try {
+      // Remove ordens vinculadas primeiro para não esbarrar em Foreign Key constraint
+      const { data: ordensDb } = await supabase
+        .from('ordens_servico')
+        .select('id')
+        .eq('oficina_id', oficinaId);
+
+      if (ordensDb && ordensDb.length > 0) {
+        const ids = ordensDb.map((o) => o.id);
+        await supabase.from('itens_os').delete().in('os_id', ids);
+        await supabase.from('ordens_servico').delete().eq('oficina_id', oficinaId);
+      }
+
+      await supabase.from('oficinas').delete().eq('id', oficinaId);
+    } catch (e) {
+      logEventoOS('WARN', 'aviso_delete_oficina_supabase', { oficinaId, erro: String(e) });
+    }
+  }
+
+  logEventoOS('INFO', 'admin_oficina_excluida', { oficinaId });
+  return true;
 }
 
 // 2. Obter ordens de serviço por oficina
@@ -114,10 +404,22 @@ export async function fetchOrdensServico(oficinaId?: string): Promise<OrdemServi
   return locais;
 }
 
-// 3. Obter uma OS completa por ID
+// 3. Obter uma OS completa por ID (via RPC isolada ou consulta direta por UUID)
 export async function fetchOrdemServicoById(id: string): Promise<{ os: OrdemServico; itens: ItemOS[]; oficina?: Oficina } | null> {
   if (isSupabaseConfigured) {
     try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('obter_os_publica', {
+        p_os_id: id,
+      });
+
+      if (!rpcError && rpcData && rpcData.os) {
+        return {
+          os: rpcData.os as OrdemServico,
+          itens: (rpcData.itens || []) as ItemOS[],
+          oficina: rpcData.oficina ? applyBrandingToOficina(rpcData.oficina as Oficina) : undefined,
+        };
+      }
+
       const { data: osData, error: osError } = await supabase
         .from('ordens_servico')
         .select('*, oficinas(*)')
@@ -133,11 +435,11 @@ export async function fetchOrdemServicoById(id: string): Promise<{ os: OrdemServ
         return {
           os: osData as OrdemServico,
           itens: (itensData || []) as ItemOS[],
-          oficina: osData.oficinas as Oficina | undefined,
+          oficina: osData.oficinas ? applyBrandingToOficina(osData.oficinas as Oficina) : undefined,
         };
       }
     } catch (e) {
-      console.warn('Erro ao buscar OS no Supabase por id, buscando local:', e);
+      logEventoOS('WARN', 'erro_buscar_os_por_id_supabase', { id, erro: String(e) });
     }
   }
 
@@ -150,7 +452,101 @@ export async function fetchOrdemServicoById(id: string): Promise<{ os: OrdemServ
   const oficinas = getLocalOficinas();
   const oficina = oficinas.find((of) => of.id === os.oficina_id);
 
-  return { os, itens, oficina };
+  return { os, itens, oficina: oficina ? applyBrandingToOficina(oficina) : undefined };
+}
+
+// 3.1 Buscar itens de uma OS específica (para edição / adição de itens pelo mecânico)
+export async function fetchItensByOSId(osId: string): Promise<ItemOS[]> {
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('itens_os')
+        .select('*')
+        .eq('os_id', osId);
+      if (!error && data && data.length > 0) {
+        return data as ItemOS[];
+      }
+    } catch {
+      // fallback local
+    }
+  }
+  return getLocalItens().filter((item) => item.os_id === osId);
+}
+
+// 3.2 Adicionar / Editar Itens de uma OS (mesmo após aprovada) e retornar status para ORCAMENTO (Reaprovação)
+export async function atualizarItensEReenviarOS(
+  osId: string,
+  novosItens: Array<{ tipo: 'PECA' | 'MAO_DE_OBRA'; descricao: string; valor: number }>
+): Promise<OrdemServico | null> {
+  const novoValorTotal = novosItens.reduce((acc, it) => acc + (Number(it.valor) || 0), 0);
+
+  // Atualizar itens e OS localmente para resposta instantânea
+  const todosItensLocais = getLocalItens().filter((it) => it.os_id !== osId);
+  const itensFormatados: ItemOS[] = novosItens.map((it, idx) => ({
+    id: `item-${osId}-${Date.now()}-${idx}`,
+    os_id: osId,
+    tipo: it.tipo,
+    descricao: it.descricao.trim(),
+    valor: Number(it.valor) || 0,
+  }));
+  todosItensLocais.push(...itensFormatados);
+  saveLocalItens(todosItensLocais);
+
+  let updatedRecord: OrdemServico | null = null;
+  const ordensLocais = getLocalOrdens();
+  const osIndex = ordensLocais.findIndex((o) => o.id === osId);
+  if (osIndex !== -1) {
+    updatedRecord = {
+      ...ordensLocais[osIndex],
+      valor_total: novoValorTotal,
+      status: 'ORCAMENTO',
+      aprovado_em: null,
+      aprovado_dispositivo: null,
+    };
+    ordensLocais[osIndex] = updatedRecord;
+    saveLocalOrdens(ordensLocais, updatedRecord);
+  }
+
+  // Sincronizar com Supabase se configurado
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.from('itens_os').delete().eq('os_id', osId);
+      const itensInsert = novosItens.map((it) => ({
+        os_id: osId,
+        tipo: it.tipo,
+        descricao: it.descricao.trim(),
+        valor: Number(it.valor) || 0,
+      }));
+      await supabase.from('itens_os').insert(itensInsert);
+
+      const { data: updatedData, error: updateErr } = await supabase
+        .from('ordens_servico')
+        .update({
+          valor_total: novoValorTotal,
+          status: 'ORCAMENTO',
+          aprovado_em: null,
+        })
+        .eq('id', osId)
+        .select()
+        .single();
+
+      if (!updateErr && updatedData) {
+        updatedRecord = updatedData as OrdemServico;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('os_single_changed', { detail: updatedRecord }));
+        }
+      }
+      logEventoOS('INFO', 'os_itens_adicionados_reenvio_aprovacao', {
+        osId,
+        qtdItens: novosItens.length,
+        novoValorTotal,
+      });
+    } catch (e) {
+      logEventoOS('WARN', 'erro_sincronizar_adicionais_supabase', { osId, erro: String(e) });
+    }
+  }
+
+  return updatedRecord;
 }
 
 // Logger estruturado leve para observabilidade na Vercel sem dependências pesadas
@@ -593,9 +989,41 @@ export function generateWhatsAppRevisaoLink(os: OrdemServico, oficinaNome: strin
   return `https://wa.me/${phone}?text=${encodeURIComponent(texto)}`;
 }
 
-export function generateWhatsAppLinkParaCliente(os: { cliente_nome: string; cliente_whatsapp: string; veiculo_modelo: string; veiculo_placa: string; codigo_curto: string; id: string }, oficinaNome: string, publicUrl: string): string {
+export function generateWhatsAppLinkParaCliente(
+  os: { cliente_nome: string; cliente_whatsapp: string; veiculo_modelo: string; veiculo_placa: string; codigo_curto: string; id: string },
+  oficinaNome: string,
+  publicUrl: string,
+  isReenvioAdicional = false
+): string {
   const phone = formatWhatsAppNumber(os.cliente_whatsapp);
-  const texto = `Olá *${os.cliente_nome}*! 👋\n\nAqui é da oficina *${oficinaNome}*.\n\nSeu orçamento para o *${os.veiculo_modelo}* (Placa: *${os.veiculo_placa}*) está pronto com fotos e itens detalhados!\n\n📋 *Código*: ${os.codigo_curto}\n🔗 *Acesse e aprove online*: ${publicUrl}\n\nQualquer dúvida, estamos à disposição!`;
+  const texto = isReenvioAdicional
+    ? `Olá *${os.cliente_nome}*! 🔧\n\nAqui é da oficina *${oficinaNome}*.\n\nAtualizamos o orçamento do seu *${os.veiculo_modelo}* (Placa: *${os.veiculo_placa}*) com novos itens identificados na avaliação técnica.\n\n📋 *Código*: ${os.codigo_curto}\n🔗 *Confira os itens atualizados e aprove online*: ${publicUrl}\n\nQualquer dúvida, estamos à disposição!`
+    : `Olá *${os.cliente_nome}*! 👋\n\nAqui é da oficina *${oficinaNome}*.\n\nSeu orçamento para o *${os.veiculo_modelo}* (Placa: *${os.veiculo_placa}*) está pronto com fotos e itens detalhados!\n\n📋 *Código*: ${os.codigo_curto}\n🔗 *Acesse e aprove online*: ${publicUrl}\n\nQualquer dúvida, estamos à disposição!`;
+
+  return `https://wa.me/${phone}?text=${encodeURIComponent(texto)}`;
+}
+
+// 8.1 Link de WhatsApp para avisar ao cliente que o Veículo está PRONTO para Retirada
+export function generateWhatsAppVeiculoProntoLink(
+  os: {
+    cliente_nome: string;
+    cliente_whatsapp: string;
+    veiculo_modelo: string;
+    veiculo_placa: string;
+    codigo_curto: string;
+    valor_total: number;
+    id: string;
+  },
+  oficinaNome: string,
+  publicUrl: string
+): string {
+  const phone = formatWhatsAppNumber(os.cliente_whatsapp);
+  const valorFmt = Number(os.valor_total || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  const texto = `Olá *${os.cliente_nome}*! 🚗✨\n\nBoa notícia! Aqui é da oficina *${oficinaNome}*.\n\nO serviço no seu *${os.veiculo_modelo}* (Placa: *${os.veiculo_placa}*) foi *CONCLUÍDO* e seu veículo já está *PRONTO PARA RETIRADA*!\n\n📋 *Ordem de Serviço*: #${os.codigo_curto}\n💰 *Valor Total*: R$ ${valorFmt}\n🔗 *Confira o resumo do serviço realizado e termo de garantia*: ${publicUrl}\n\nEstamos te aguardando!`;
 
   return `https://wa.me/${phone}?text=${encodeURIComponent(texto)}`;
 }

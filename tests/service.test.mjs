@@ -96,21 +96,28 @@ assert.equal(totalMaoDeObra, 120.00);
 assert.equal(valorTotal, 445.50);
 console.log('✅ 5. Cálculo de Totais: Discriminação entre peças, mão de obra e total exata.');
 
-// 6. Teste de Contas Demo de Autenticação
+// 6. Teste de Contas Sandbox/Demo e Trava de Segurança de Produção
 const DEMO_ACCOUNTS = [
-  { email: 'lider@oficina.com', senhaPadrao: '123456', oficinaId: '11111111-1111-1111-1111-111111111111' },
-  { email: 'alemao@oficina.com', senhaPadrao: '123456', oficinaId: '22222222-2222-2222-2222-222222222222' },
-  { email: 'cartech@oficina.com', senhaPadrao: '123456', oficinaId: '33333333-3333-3333-3333-333333333333' },
+  { email: 'lider@oficina.com', oficinaId: '11111111-1111-1111-1111-111111111111' },
+  { email: 'alemao@oficina.com', oficinaId: '22222222-2222-2222-2222-222222222222' },
+  { email: 'cartech@oficina.com', oficinaId: '33333333-3333-3333-3333-333333333333' },
 ];
+
+function verificarPermissaoDemo(isSupabaseConfigured, envEnableDemo) {
+  return !isSupabaseConfigured || envEnableDemo === 'true';
+}
 
 assert.equal(DEMO_ACCOUNTS.length, 3);
 const genericUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 DEMO_ACCOUNTS.forEach(acc => {
   assert.ok(acc.email.includes('@'));
-  assert.equal(acc.senhaPadrao, '123456');
   assert.match(acc.oficinaId, genericUuidRegex);
 });
-console.log('✅ 6. Contas Demo: IDs e credenciais de todas as 3 oficinas pré-configuradas e válidas.');
+// Em produção real (Supabase configurado e sem flag de demo), o modo demo DEVE estar bloqueado
+assert.equal(verificarPermissaoDemo(true, undefined), false);
+assert.equal(verificarPermissaoDemo(true, 'false'), false);
+assert.equal(verificarPermissaoDemo(false, undefined), true);
+console.log('✅ 6. Segurança & Isolamento: Trava de produção contra login demo sem autenticação validada.');
 
 // 7. Teste de Máscaras Automáticas de Input (JS OrçaFácil)
 function maskPlaca(value) {

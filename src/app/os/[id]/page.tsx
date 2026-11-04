@@ -152,11 +152,12 @@ function OSClienteContent() {
     );
   }
 
-  // Separar itens por Serviços e Peças (exatamente como na imagem de referência)
+  // Separar itens por Serviços Técnicos e Peças
   const services = itens.filter((i) => i.tipo === 'MAO_DE_OBRA');
   const parts = itens.filter((i) => i.tipo === 'PECA');
   const serviceTotal = services.reduce((s, i) => s + Number(i.valor), 0);
   const partsTotal = parts.reduce((s, i) => s + Number(i.valor), 0);
+  const brandColor = oficina?.cor_primaria || '#22c55e';
 
   const oficinaWhatsPhone = oficina?.whatsapp ? formatWhatsAppNumber(oficina.whatsapp) : '5511999998888';
   const duvidaWhatsLink = `https://wa.me/${oficinaWhatsPhone}?text=${encodeURIComponent(
@@ -166,16 +167,26 @@ function OSClienteContent() {
   return (
     <div className="min-h-screen bg-[#080d14] text-slate-100 flex flex-col pb-36 selection:bg-emerald-500 selection:text-slate-950">
       
-      {/* Top Header com Logo PitTrack e Ação WhatsApp */}
+      {/* Top Header com Logotipo Individual e Cor da Oficina */}
       <header className="sticky top-0 z-30 bg-[#080d14]/95 backdrop-blur-md border-b border-[#1c2e42] px-4 py-3 shadow-md">
         <div className="max-w-md mx-auto flex items-center justify-between">
-          <PitTrackLogo size="sm" />
+          <PitTrackLogo
+            size="sm"
+            logoUrl={oficina?.logo_url}
+            corPrimaria={brandColor}
+            nomeOficina={oficina?.nome}
+          />
 
           <a
             href={duvidaWhatsLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-xl transition-all"
+            style={{
+              color: brandColor,
+              backgroundColor: `${brandColor}18`,
+              borderColor: `${brandColor}40`,
+            }}
+            className="flex items-center gap-1.5 text-[11px] font-bold border px-3 py-1.5 rounded-xl transition-all"
           >
             <MessageCircle className="w-3.5 h-3.5 fill-current" />
             <span>Falar c/ Oficina</span>
@@ -186,8 +197,31 @@ function OSClienteContent() {
       {/* Main Container Mobile Fiel à Imagem de Referência */}
       <main className="max-w-md mx-auto w-full px-4 pt-4 flex-1 space-y-4">
         
-        {/* Banner de Status Aprovado com Sucesso */}
-        {isApprovedSuccess && (
+        {/* Banner de Veículo Pronto ou Orçamento Aprovado */}
+        {os.status === 'FINALIZADO' ? (
+          <div
+            style={{ borderColor: `${brandColor}70`, backgroundColor: `${brandColor}15` }}
+            className="border rounded-2xl p-4 shadow-lg animate-in fade-in zoom-in-95 duration-300"
+          >
+            <div className="flex items-start gap-3">
+              <div
+                style={{ backgroundColor: brandColor }}
+                className="w-10 h-10 rounded-xl text-slate-950 flex items-center justify-center flex-shrink-0 font-bold shadow-md"
+              >
+                <CheckCircle2 className="w-6 h-6 stroke-[2.5]" />
+              </div>
+              <div>
+                <h3 style={{ color: brandColor }} className="text-sm font-extrabold flex items-center gap-1.5">
+                  <span>VEÍCULO PRONTO PARA RETIRADA!</span>
+                  <Sparkles className="w-4 h-4" />
+                </h3>
+                <p className="text-xs text-slate-200 mt-0.5 leading-relaxed">
+                  Todos os serviços técnicos do seu <strong>{os.veiculo_modelo}</strong> foram concluídos pela equipe da <strong>{oficina?.nome || 'oficina'}</strong>. Seu veículo já está liberado para retirada!
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : isApprovedSuccess ? (
           <div className="bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-transparent border border-emerald-500/50 rounded-2xl p-4 shadow-lg animate-in fade-in zoom-in-95 duration-300">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center flex-shrink-0 font-bold shadow-md shadow-emerald-500/30">
@@ -228,7 +262,7 @@ function OSClienteContent() {
               </div>
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* Card 1: Work Order Title + Status Pill + Customer + Vehicle (Fiel ao Mockup do Telefone) */}
         <div className="bg-[#0e1724] rounded-2xl border border-[#1c2e42] p-4 shadow-xl space-y-3">
@@ -239,13 +273,22 @@ function OSClienteContent() {
               Ordem de Serviço #{os.codigo_curto}
             </h2>
             <span
+              style={
+                os.status === 'FINALIZADO' || isApprovedSuccess
+                  ? { backgroundColor: brandColor, borderColor: brandColor }
+                  : undefined
+              }
               className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                isApprovedSuccess
-                  ? 'bg-emerald-500 text-slate-950 font-black border-emerald-400 shadow-md shadow-emerald-500/20'
+                os.status === 'FINALIZADO' || isApprovedSuccess
+                  ? 'text-slate-950 font-black shadow-md'
                   : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
               }`}
             >
-              {isApprovedSuccess ? 'Aprovado' : 'Em Aberto'}
+              {os.status === 'FINALIZADO'
+                ? 'Pronto p/ Retirada'
+                : isApprovedSuccess
+                ? 'Aprovado'
+                : 'Em Aberto'}
             </span>
           </div>
 
@@ -320,13 +363,13 @@ function OSClienteContent() {
         )}
 
         {/* =========================================================================
-            CARD 2: SERVICES (Mão de Obra) - Fiel ao Mockup do iPhone
+            CARD 2: SERVIÇOS TÉCNICOS
         ========================================================================= */}
         {services.length > 0 && (
           <div className="bg-[#0e1724] rounded-2xl border border-[#1c2e42] p-4 shadow-xl space-y-3">
             <div className="flex items-center gap-2 border-b border-[#182738] pb-2.5">
-              <Wrench className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-sm font-black text-white tracking-tight">Serviços & Mão de Obra</h3>
+              <Wrench className="w-4 h-4" style={{ color: brandColor }} />
+              <h3 className="text-sm font-black text-white tracking-tight">Serviços Técnicos</h3>
             </div>
 
             <div className="space-y-2.5">
@@ -340,9 +383,9 @@ function OSClienteContent() {
               ))}
             </div>
 
-            {/* Subtotal Service Total */}
+            {/* Subtotal Serviço Técnico */}
             <div className="border-t border-[#182738] pt-2.5 flex items-center justify-between text-xs font-bold">
-              <span className="text-[#8b9eb0]">Total de Serviços</span>
+              <span className="text-[#8b9eb0]">Total de Serviço Técnico</span>
               <span className="text-white font-mono font-extrabold">
                 R$ {serviceTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
@@ -382,7 +425,7 @@ function OSClienteContent() {
         )}
 
         {/* =========================================================================
-            CARD 4: ESTIMATED TOTAL - Fiel ao Mockup do iPhone (Verde Neon)
+            CARD 4: ESTIMATED TOTAL (Com a Cor Padrão da Oficina)
         ========================================================================= */}
         <div className="bg-[#091018] rounded-2xl border border-[#1c2e42] p-4 shadow-xl flex items-center justify-between">
           <div>
@@ -391,17 +434,25 @@ function OSClienteContent() {
             </span>
             <span className="text-[10px] text-[#5c7287]">Garantia legal de 90 dias</span>
           </div>
-          <span className="text-2xl font-black text-emerald-400 font-mono tracking-tight glow-green">
+          <span
+            style={{ color: brandColor }}
+            className="text-2xl font-black font-mono tracking-tight"
+          >
             R$ {Number(os.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
 
-        {/* Selo de Garantia e Normas ABNT */}
-        <div className="bg-[#0e1724]/60 border border-[#1c2e42] rounded-xl p-3 flex items-center gap-2.5 text-xs text-[#8b9eb0]">
-          <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-          <span>
-            Peças originais com garantia de fábrica e serviços executados segundo normas ABNT.
-          </span>
+        {/* Selo de Garantia, Normas ABNT e Conformidade LGPD */}
+        <div className="bg-[#0e1724]/60 border border-[#1c2e42] rounded-xl p-3.5 space-y-2 text-xs text-[#8b9eb0]">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            <span>
+              Peças com garantia legal de 90 dias (Art. 26 do CDC) e serviços executados segundo normas técnicas.
+            </span>
+          </div>
+          <p className="text-[10px] text-[#5c7287] border-t border-[#182738] pt-2 leading-relaxed">
+            🔒 <strong className="text-slate-400">Proteção de Dados (LGPD — Lei nº 13.709/2018):</strong> Os dados deste veículo, fotos de check-in e contato são utilizados exclusivamente pela oficina responsável para execução do serviço, emissão de garantia e avisos de revisão preventiva. Tecnologia fornecida por <strong className="text-slate-300">JS OrçaFácil (JoeSevero Tech)</strong>.
+          </p>
         </div>
       </main>
 
@@ -429,7 +480,19 @@ function OSClienteContent() {
       ========================================================================= */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#080d14]/95 backdrop-blur-xl border-t border-[#1c2e42] px-4 py-3 shadow-2xl">
         <div className="max-w-md mx-auto space-y-2">
-          {isApprovedSuccess ? (
+          {os.status === 'FINALIZADO' ? (
+            <div
+              style={{
+                backgroundColor: `${brandColor}20`,
+                borderColor: `${brandColor}50`,
+                color: brandColor,
+              }}
+              className="w-full border font-black text-xs py-3.5 px-4 rounded-2xl text-center flex items-center justify-center gap-2 shadow-lg"
+            >
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+              <span>SERVIÇO CONCLUÍDO • VEÍCULO PRONTO PARA RETIRADA</span>
+            </div>
+          ) : isApprovedSuccess ? (
             <div className="w-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-black text-xs py-3.5 px-4 rounded-2xl text-center flex items-center justify-center gap-2 shadow-lg">
               <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
               <span>ORÇAMENTO JÁ APROVADO COM SUCESSO</span>
@@ -439,7 +502,8 @@ function OSClienteContent() {
               type="button"
               disabled={isApproving}
               onClick={handleAprovar}
-              className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 active:scale-98 text-slate-950 font-black text-sm py-4 px-4 rounded-2xl shadow-xl shadow-emerald-500/30 transition-all uppercase tracking-wide cursor-pointer"
+              style={{ backgroundColor: brandColor }}
+              className="w-full flex items-center justify-center gap-2 hover:opacity-90 active:scale-98 text-slate-950 font-black text-sm py-4 px-4 rounded-2xl shadow-xl transition-all uppercase tracking-wide cursor-pointer"
             >
               {isApproving ? (
                 <span>Confirmando Aprovação...</span>

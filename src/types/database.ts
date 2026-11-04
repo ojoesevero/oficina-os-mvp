@@ -2,11 +2,28 @@ export type StatusOS = 'ORCAMENTO' | 'APROVADO' | 'EM_SERVICO' | 'FINALIZADO' | 
 
 export type TipoItem = 'PECA' | 'MAO_DE_OBRA';
 
+export type PlanoSaaS = 'ESSENCIAL' | 'PRO' | 'MULTI';
+
+export interface ServicoCatalogo {
+  id?: string;
+  tipo: TipoItem;
+  descricao: string;
+  valor: number;
+}
+
 export interface Oficina {
   id: string;
   nome: string;
   whatsapp: string;
   email?: string;
+  senha_acesso?: string;
+  cnpj_cpf?: string | null;
+  endereco?: string | null;
+  logo_url?: string | null;
+  cor_primaria?: string | null;
+  plano?: PlanoSaaS;
+  ativo?: boolean;
+  servicos_rapidos?: ServicoCatalogo[];
   created_at?: string;
 }
 

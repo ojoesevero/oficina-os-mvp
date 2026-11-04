@@ -1,4 +1,5 @@
-# 🚗 JS OrçaFácil - Gestão Ágil para Oficinas & Orçamentos no WhatsApp
+# 🚗 JS OrçaFácil — Gestão Ágil para Oficinas & Orçamentos no WhatsApp
+> **Uma solução oficial desenvolvida e fornecida por JoeSevero Tech**
 
 [![Next.js 16](https://img.shields.io/badge/Next.js-16.4.2-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React-19.3-blue?style=flat&logo=react)](https://react.dev/)
@@ -53,12 +54,8 @@ Sistema moderno **mobile-first e desktop widescreen**, com **idioma 100% em Port
 ## ⚡ Principais Funcionalidades
 
 ### 1. 🔐 Acesso & Login Individual da Oficina (`/login`)
-- Cada oficina possui sua própria conta, credenciais e pátio isolado.
-- Botões de **Acesso Rápido de Demonstração (1 Clique)** para testes rápidos sem digitação.
-- Contas demo pré-configuradas:
-  - 🏢 `lider@oficina.com` (**AutoCenter Líder**) | Senha: `123456`
-  - 🏢 `alemao@oficina.com` (**Oficina Mecânica Alemão & Especialistas**) | Senha: `123456`
-  - 🏢 `cartech@oficina.com` (**CarTech Performance & Injeção**) | Senha: `123456`
+- **Autenticação Corporativa Segura:** Em ambiente de produção conectado ao Supabase Auth, cada oficina acessa exclusivamente com suas próprias credenciais autenticadas e políticas de isolamento **Row Level Security (RLS)** baseadas em `auth.uid()`.
+- **Trava de Produção Automática:** Contas de demonstração ficam **desabilitadas automaticamente** em produção real, sendo exibidas apenas em ambientes de homologação/sandbox (`NEXT_PUBLIC_ENABLE_DEMO=true` ou modo local sem banco de produção).
 
 ### 2. 📋 Dashboard do Pátio em Tempo Real (`/`)
 - Cabeçalho industrial dark exibindo a oficina autenticada ativa e botão de Logout ("Sair").
@@ -171,6 +168,7 @@ Acesse [http://localhost:3000](http://localhost:3000) no seu navegador. O sistem
 ## 📑 Documentação e Manuais
 
 - 📋 **Guia de Pré-Requisitos para Clientes:** [`PRE_REQUISITOS_IMPLANTACAO.md`](./PRE_REQUISITOS_IMPLANTACAO.md) — Tudo o que uma oficina mecânica precisa fornecer e providenciar para começar a usar o sistema em 15 minutos.
+- ⚖️ **Termos de Uso, Conformidade LGPD, Operação SaaS e Contrato:** [`TERMOS_LGPD_CONTRATO.md`](./TERMOS_LGPD_CONTRATO.md) — Enquadramento comercial, contrato de assinatura SaaS, responsabilidades LGPD, política de backup e SLA.
 - 💼 **Plano de Ação Comercial & Vendas:** [`PLANO_DE_ACAO_VENDAS.md`](./PLANO_DE_ACAO_VENDAS.md) — Estratégia de abordagem, roteiro de demonstração em 3 minutos, quebra de objeções e tabela de preços.
 - 🗺️ **Rota de Visitas em Campo (Canoas/RS):** [`ROTA_DE_VISITAS_CANOAS.md`](./ROTA_DE_VISITAS_CANOAS.md) — Roteiro geográfico otimizado de 16 potenciais clientes por bairros (Estância Velha, Guajuviras, Rio Branco).
 - 🛠️ **Relatório Técnico & Auditoria:** [`RELATORIO_AUDITORIA.md`](./RELATORIO_AUDITORIA.md) — Histórico de arquitetura, evidências de testes (100% de sucesso), compilação e correções.
