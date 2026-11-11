@@ -337,7 +337,7 @@ export default function SuperAdminPage() {
   }
 
   // ============================================================================
-  // TELA DE LOGIN EXCLUSIVA DO ADMINISTRADOR MASTER (JOESEVERO TECH)
+  // TELA DE LOGIN EXCLUSIVA DO ADMINISTRADOR MASTER (JONATAN SEVERO TECH)
   // ============================================================================
   if (!isAdminLogged) {
     return (
@@ -354,7 +354,7 @@ export default function SuperAdminPage() {
               Painel Administrador Master
             </h1>
             <p className="text-xs text-[#8b9eb0]">
-              JoeSevero Tech • Gestão de Oficinas, Serviços e Logotipos
+              Jonatan Severo Tech • Gestão de Oficinas, Serviços e Logotipos
             </p>
           </div>
 
@@ -370,7 +370,7 @@ export default function SuperAdminPage() {
                   required
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
-                  placeholder="admin@joeseverotech.com"
+                  placeholder="admin@jonatanseverotech.com"
                   className="w-full bg-[#080d14] border border-[#1c2e42] rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -408,7 +408,7 @@ export default function SuperAdminPage() {
           </form>
 
           <div className="pt-3 border-t border-[#182636] flex items-center justify-between text-[11px] text-[#6d8296]">
-            <span>Padrão inicial: admin@joeseverotech.com</span>
+            <span>Padrão inicial: admin@jonatanseverotech.com</span>
             <Link href="/login" className="text-emerald-400 hover:underline font-bold">
               Ir p/ Login Cliente →
             </Link>
@@ -448,7 +448,7 @@ export default function SuperAdminPage() {
         </div>
       )}
 
-      {/* Topbar Exclusiva JoeSevero Tech */}
+      {/* Topbar Exclusiva Jonatan Severo Tech */}
       <header className="sticky top-0 z-30 bg-[#0b121c]/95 backdrop-blur-md border-b border-[#1c2e42] px-4 lg:px-8 py-4">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -458,7 +458,7 @@ export default function SuperAdminPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base font-black text-white tracking-tight">
-                  JoeSevero Tech • Admin Master
+                  Jonatan Severo Tech • Admin Master
                 </h1>
                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                   Super Admin
@@ -1111,7 +1111,7 @@ export default function SuperAdminPage() {
       )}
 
       {/* =========================================================================
-          MODAL 3: CREDENCIAIS MASTER DO SUPER ADMIN (JOESEVERO TECH)
+          MODAL 3: CREDENCIAIS MASTER DO SUPER ADMIN (JONATAN SEVERO TECH)
       ========================================================================= */}
       {isSecurityModalOpen && (
         <div className="fixed inset-0 z-50 bg-[#060a10]/90 backdrop-blur-md flex items-center justify-center p-4">
@@ -1122,7 +1122,7 @@ export default function SuperAdminPage() {
                   Credenciais do Administrador Master
                 </h3>
                 <p className="text-xs text-[#8b9eb0]">
-                  Exclusivo JoeSevero Tech (/admin)
+                  Exclusivo Jonatan Severo Tech (/admin)
                 </p>
               </div>
               <button

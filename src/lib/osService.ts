@@ -989,16 +989,104 @@ export function generateWhatsAppRevisaoLink(os: OrdemServico, oficinaNome: strin
   return `https://wa.me/${phone}?text=${encodeURIComponent(texto)}`;
 }
 
+function formatMoedaWhatsApp(valor: number): string {
+  return Number(valor || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function generateWhatsAppLinkParaCliente(
-  os: { cliente_nome: string; cliente_whatsapp: string; veiculo_modelo: string; veiculo_placa: string; codigo_curto: string; id: string },
+  os: {
+    cliente_nome: string;
+    cliente_whatsapp: string;
+    veiculo_modelo: string;
+    veiculo_placa: string;
+    codigo_curto: string;
+    id: string;
+    valor_total?: number;
+    itens?: Array<{ tipo: 'PECA' | 'MAO_DE_OBRA'; descricao: string; valor: number }>;
+  },
   oficinaNome: string,
   publicUrl: string,
   isReenvioAdicional = false
 ): string {
   const phone = formatWhatsAppNumber(os.cliente_whatsapp);
-  const texto = isReenvioAdicional
-    ? `Olá *${os.cliente_nome}*! 🔧\n\nAqui é da oficina *${oficinaNome}*.\n\nAtualizamos o orçamento do seu *${os.veiculo_modelo}* (Placa: *${os.veiculo_placa}*) com novos itens identificados na avaliação técnica.\n\n📋 *Código*: ${os.codigo_curto}\n🔗 *Confira os itens atualizados e aprove online*: ${publicUrl}\n\nQualquer dúvida, estamos à disposição!`
-    : `Olá *${os.cliente_nome}*! 👋\n\nAqui é da oficina *${oficinaNome}*.\n\nSeu orçamento para o *${os.veiculo_modelo}* (Placa: *${os.veiculo_placa}*) está pronto com fotos e itens detalhados!\n\n📋 *Código*: ${os.codigo_curto}\n🔗 *Acesse e aprove online*: ${publicUrl}\n\nQualquer dúvida, estamos à disposição!`;
+
+  // Busca itens fornecidos ou recupera automaticamente do cache local da OS
+  const itensOS =
+    os.itens && os.itens.length > 0
+      ? os.itens
+      : typeof window !== 'undefined'
+      ? getLocalItens().filter((it) => it.os_id === os.id)
+      : [];
+
+  const totalPecas = itensOS
+    .filter((it) => it.tipo === 'PECA')
+    .reduce((acc, it) => acc + Number(it.valor || 0), 0);
+
+  const totalServicos = itensOS
+    .filter((it) => it.tipo === 'MAO_DE_OBRA')
+    .reduce((acc, it) => acc + Number(it.valor || 0), 0);
+
+  const somaItens = totalPecas + totalServicos;
+  const osLocal =
+    typeof window !== 'undefined' ? getLocalOrdens().find((o) => o.id === os.id) : undefined;
+  const valorTotalFinal =
+    somaItens > 0
+      ? somaItens
+      : os.valor_total !== undefined
+      ? Number(os.valor_total)
+      : Number(osLocal?.valor_total || 0);
+
+  const linhasItens =
+    itensOS.length > 0
+      ? [
+          '',
+          '*ITENS DO ORÇAMENTO:*',
+          ...itensOS.map(
+            (it) =>
+              `• ${it.descricao} _(${it.tipo === 'PECA' ? 'Peça' : 'Serviço Técnico'})_: *R$ ${formatMoedaWhatsApp(it.valor)}*`
+          ),
+        ].join('\n')
+      : '';
+
+  const blocoTotais = [
+    '',
+    '*RESUMO DE VALORES:*',
+    ...(itensOS.length > 0
+      ? [
+          `📦 *Peças e Insumos*: R$ ${formatMoedaWhatsApp(totalPecas)}`,
+          `🔧 *Serviços Técnicos*: R$ ${formatMoedaWhatsApp(totalServicos)}`,
+        ]
+      : []),
+    `💰 *VALOR TOTAL*: *R$ ${formatMoedaWhatsApp(valorTotalFinal)}*`,
+  ].join('\n');
+
+  const cabecalho = isReenvioAdicional
+    ? [
+        `Olá *${os.cliente_nome}*! 🔧`,
+        '',
+        `Aqui é da oficina *${oficinaNome}*.`,
+        `Atualizamos o orçamento do seu *${os.veiculo_modelo}* (Placa: *${os.veiculo_placa}*) com novos itens identificados na avaliação técnica.`,
+      ].join('\n')
+    : [
+        `Olá *${os.cliente_nome}*! 👋`,
+        '',
+        `Aqui é da oficina *${oficinaNome}*.`,
+        `O orçamento do seu *${os.veiculo_modelo}* (Placa: *${os.veiculo_placa}*) já está pronto para sua análise!`,
+      ].join('\n');
+
+  const rodape = [
+    '',
+    `📋 *Ordem de Serviço*: #${os.codigo_curto}`,
+    `🔗 *Veja as fotos e aprove online com 1 clique*:`,
+    `${publicUrl}`,
+    '',
+    'Qualquer dúvida, estamos à disposição!',
+  ].join('\n');
+
+  const texto = `${cabecalho}\n${linhasItens}\n${blocoTotais}\n${rodape}`;
 
   return `https://wa.me/${phone}?text=${encodeURIComponent(texto)}`;
 }

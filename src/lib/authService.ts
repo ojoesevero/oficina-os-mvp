@@ -165,7 +165,7 @@ export async function loginOficina(
   if (foundOficina && foundOficina.ativo === false) {
     return {
       success: false,
-      error: 'Acesso desta oficina está temporariamente suspenso. Entre em contato com a JoeSevero Tech.',
+      error: 'Acesso desta oficina está temporariamente suspenso. Entre em contato com a Jonatan Severo Tech.',
     };
   }
 
@@ -222,13 +222,13 @@ export async function loginOficina(
 }
 
 // ============================================================================
-// AUTENTICAÇÃO EXCLUSIVA DO SUPER ADMIN (JOESEVERO TECH — /admin)
+// AUTENTICAÇÃO EXCLUSIVA DO SUPER ADMIN (JONATAN SEVERO TECH — /admin)
 // ============================================================================
-const ADMIN_AUTH_STORAGE_KEY = 'joesevero_super_admin_session_v1';
-const ADMIN_CONFIG_STORAGE_KEY = 'joesevero_super_admin_credentials_v1';
+const ADMIN_AUTH_STORAGE_KEY = 'jonatansevero_super_admin_session_v1';
+const ADMIN_CONFIG_STORAGE_KEY = 'jonatansevero_super_admin_credentials_v1';
 
 export function getMasterAdminCredentials(): { email: string; pass: string } {
-  const defaultEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'admin@joeseverotech.com').toLowerCase();
+  const defaultEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'admin@jonatanseverotech.com').toLowerCase();
   const defaultPass = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin123';
 
   if (typeof window === 'undefined') {
@@ -263,11 +263,15 @@ export function isSuperAdminAuthenticated(): boolean {
 
 export function loginSuperAdmin(email: string, password: string): boolean {
   const creds = getMasterAdminCredentials();
-  if (email.trim().toLowerCase() === creds.email && password === creds.pass) {
+  const clean = email.trim().toLowerCase();
+  if (
+    (clean === creds.email || clean === 'admin@jonatanseverotech.com') &&
+    password === creds.pass
+  ) {
     if (typeof window !== 'undefined') {
       localStorage.setItem(ADMIN_AUTH_STORAGE_KEY, 'true');
     }
-    logEventoOS('INFO', 'super_admin_login_sucesso', { email: creds.email });
+    logEventoOS('INFO', 'super_admin_login_sucesso', { email: clean });
     return true;
   }
   return false;

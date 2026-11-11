@@ -86,7 +86,7 @@ export default function PitTrackLogo({
                 style={{ color: brandColor }}
                 className={`font-bold tracking-[0.14em] uppercase mt-0.5 ${subSizes[size]}`}
               >
-                JS OrçaFácil • JoeSevero Tech
+                JS OrçaFácil • Jonatan Severo Tech
               </span>
             )}
           </>
@@ -101,7 +101,7 @@ export default function PitTrackLogo({
               <span
                 className={`font-bold tracking-[0.18em] text-[#8b9eb0] uppercase mt-0.5 ${subSizes[size]}`}
               >
-                by JoeSevero Tech
+                by Jonatan Severo Tech
               </span>
             )}
           </>

@@ -1,6 +1,6 @@
 # ⚖️ Governança SaaS, Regularização Comercial, LGPD e Termos de Uso
 **Produto:** JS OrçaFácil — Gestão Ágil para Oficinas & Orçamentos no WhatsApp  
-**Fornecedora Oficial:** **JoeSevero Tech**
+**Fornecedora Oficial:** **Jonatan Severo Tech** (Responsável: **Jonatan Severo**)
 
 ---
 
@@ -10,10 +10,10 @@ Para que o proprietário da oficina mecânica compreenda imediatamente quem forn
 
 - **Nome do Produto / Plataforma:** **JS OrçaFácil**  
   *(O que faz: Elimina o bloco de papel na oficina, registra fotos de check-in do veículo e envia orçamentos profissionais aprovados em 1 clique no WhatsApp).*
-- **Empresa Fornecedora / Desenvolvedora:** **JoeSevero Tech**  
+- **Empresa Fornecedora / Desenvolvedora:** **Jonatan Severo Tech**  
   *(Quem fornece: Empresa responsável pelo desenvolvimento, infraestrutura em nuvem, implantação, suporte técnico e faturamento).*
 - **Assinatura Oficial:**  
-  > **"JS OrçaFácil • Uma solução JoeSevero Tech"**
+  > **"JS OrçaFácil • Uma solução Jonatan Severo Tech"**
 
 ---
 
@@ -31,7 +31,7 @@ Para comercializar o **JS OrçaFácil** como Software como Serviço (SaaS) + Tax
 
 ### B. Emissão de NFS-e (Nota Fiscal de Serviços Eletrônica)
 - **Descrição Padrão para Mensalidade:**  
-  *"Assinatura mensal de uso da plataforma em nuvem JS OrçaFácil (JoeSevero Tech) para gestão de ordens de serviço e orçamentos digitais — Competência MM/AAAA."*
+  *"Assinatura mensal de uso da plataforma em nuvem JS OrçaFácil (Jonatan Severo Tech) para gestão de ordens de serviço e orçamentos digitais — Competência MM/AAAA."*
 - **Descrição Padrão para Taxa de Implantação:**  
   *"Serviço de implantação, parametrização, configuração de catálogo de serviços e treinamento operacional na plataforma JS OrçaFácil."*
 
@@ -65,7 +65,7 @@ Para comercializar o **JS OrçaFácil** como Software como Serviço (SaaS) + Tax
 
 ### A. Papéis das Partes segundo a LGPD
 - **Controladora dos Dados (Oficina Mecânica Contratante):** É quem coleta os dados do proprietário do veículo no balcão (Nome, Telefone/WhatsApp, Placa, Modelo e Fotos do veículo) e define a finalidade do atendimento.
-- **Operadora dos Dados (JoeSevero Tech / JS OrçaFácil):** Fornece a infraestrutura tecnológica segura para processar, armazenar e exibir o orçamento ao cliente final em nome da oficina.
+- **Operadora dos Dados (Jonatan Severo Tech / JS OrçaFácil):** Fornece a infraestrutura tecnológica segura para processar, armazenar e exibir o orçamento ao cliente final em nome da oficina.
 
 ### B. Dados Coletados e Base Legal
 | Dado Coletado | Finalidade Estrita | Base Legal (Art. 7º da LGPD) |
@@ -76,7 +76,7 @@ Para comercializar o **JS OrçaFácil** como Software como Serviço (SaaS) + Tax
 | **Carimbo de Tempo e Dispositivo (`user_agent`)** | Trilha de auditoria eletrônica no momento do clique em "Aprovar Orçamento". | **Exercício Regular de Direitos em Contrato** (Art. 7º, VI) |
 
 ### C. Direitos do Titular (Exclusão e Correção)
-- Caso o proprietário de um veículo solicite à oficina a exclusão do seu telefone da lista de lembretes preventivos de 6 meses ou a retificação de dados cadastrais, a oficina (ou o suporte da **JoeSevero Tech** mediante solicitação da oficina) realiza a atualização ou anonimização imediata no banco de dados.
+- Caso o proprietário de um veículo solicite à oficina a exclusão do seu telefone da lista de lembretes preventivos de 6 meses ou a retificação de dados cadastrais, a oficina (ou o suporte da **Jonatan Severo Tech** mediante solicitação da oficina) realiza a atualização ou anonimização imediata no banco de dados.
 
 ---
 
@@ -86,7 +86,7 @@ Para comercializar o **JS OrçaFácil** como Software como Serviço (SaaS) + Tax
 
 > ### TERMO DE ADESÃO E LICENCIAMENTO DE SOFTWARE — JS ORÇAFÁCIL
 > 
-> **FORNECEDORA (OPERADORA):** **JOESEVERO TECH**, responsável pela plataforma **JS OrçaFácil**.  
+> **FORNECEDORA (OPERADORA):** **JONATAN SEVERO TECH**, responsável pela plataforma **JS OrçaFácil**.  
 > **CONTRATANTE (OFICINA):** `[Nome Fantasia / Razão Social da Oficina]`, inscrita no CPF/CNPJ nº `[Número]`, com sede em `[Endereço]`.
 > 
 > **1. OBJETO:** O presente termo tem por objeto o licenciamento de uso não exclusivo da plataforma em nuvem **JS OrçaFácil**, destinada à abertura de Ordens de Serviço, registro fotográfico de check-in e envio de orçamentos para aprovação via WhatsApp.
@@ -99,7 +99,7 @@ Para comercializar o **JS OrçaFácil** como Software como Serviço (SaaS) + Tax
 > 
 > **4. RESPONSABILIDADES E LGPD:**  
 > - A **CONTRATANTE** é a única responsável pela veracidade dos valores de peças, mão de obra, diagnósticos mecânicos e garantias prestadas aos seus clientes finais.  
-> - Em conformidade com a **Lei nº 13.709/2018 (LGPD)**, a **CONTRATANTE** atua como *Controladora* dos dados de seus clientes e a **JOESEVERO TECH** atua como *Operadora*, comprometendo-se a manter o sigilo, o isolamento de acesso por senha e a não compartilhar nem comercializar dados de clientes da oficina com terceiros.
+> - Em conformidade com a **Lei nº 13.709/2018 (LGPD)**, a **CONTRATANTE** atua como *Controladora* dos dados de seus clientes e a **JONATAN SEVERO TECH** atua como *Operadora*, comprometendo-se a manter o sigilo, o isolamento de acesso por senha e a não compartilhar nem comercializar dados de clientes da oficina com terceiros.
 > 
 > **5. ACEITE:** O pagamento da taxa de implantação ou o início do uso efetivo da plataforma após o período de degustação implica na concordância integral com este Termo.
 > 

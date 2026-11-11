@@ -1,5 +1,5 @@
 # 🚗 JS OrçaFácil — Gestão Ágil para Oficinas & Orçamentos no WhatsApp
-> **Uma solução oficial desenvolvida e fornecida por JoeSevero Tech**
+> **Uma solução oficial desenvolvida e fornecida por Jonatan Severo Tech (Jonatan Severo)**
 
 [![Next.js 16](https://img.shields.io/badge/Next.js-16.4.2-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React-19.3-blue?style=flat&logo=react)](https://react.dev/)

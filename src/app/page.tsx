@@ -225,6 +225,12 @@ export default function DashboardPage() {
             veiculo_placa: editingOS.veiculo_placa,
             codigo_curto: editingOS.codigo_curto,
             id: editingOS.id,
+            valor_total: novoTotal,
+            itens: editingItens.map((it) => ({
+              tipo: it.tipo,
+              descricao: it.descricao,
+              valor: Number(it.valor),
+            })),
           },
           currentOficina.nome,
           publicUrl,
@@ -383,7 +389,13 @@ export default function DashboardPage() {
     );
   }
 
-  const totalModalItens = editingItens.reduce((acc, it) => acc + (Number(it.valor) || 0), 0);
+  const subtotalModalPecas = editingItens
+    .filter((it) => it.tipo === 'PECA')
+    .reduce((acc, it) => acc + (Number(it.valor) || 0), 0);
+  const subtotalModalServicos = editingItens
+    .filter((it) => it.tipo === 'MAO_DE_OBRA')
+    .reduce((acc, it) => acc + (Number(it.valor) || 0), 0);
+  const totalModalItens = subtotalModalPecas + subtotalModalServicos;
 
   return (
     <div className="min-h-screen bg-[#080d14] text-slate-100 flex selection:bg-emerald-500 selection:text-[#080d14]">
@@ -741,6 +753,7 @@ export default function DashboardPage() {
                                 veiculo_placa: os.veiculo_placa,
                                 codigo_curto: os.codigo_curto,
                                 id: os.id,
+                                valor_total: Number(os.valor_total),
                               },
                               currentOficina.nome,
                               publicUrl
@@ -858,6 +871,7 @@ export default function DashboardPage() {
                             veiculo_placa: os.veiculo_placa,
                             codigo_curto: os.codigo_curto,
                             id: os.id,
+                            valor_total: Number(os.valor_total),
                           },
                           currentOficina.nome,
                           publicUrl
@@ -917,18 +931,18 @@ export default function DashboardPage() {
                             setProntoOS(os);
                           }}
                           style={{ backgroundColor: `${brandColor}18`, color: brandColor, borderColor: `${brandColor}45` }}
-                          className="w-full flex items-center justify-center gap-1.5 text-xs font-bold py-2.5 px-3 rounded-xl border transition-all cursor-pointer"
+                          className="w-full min-h-[46px] flex items-center justify-center gap-2 text-xs font-bold py-3 px-3.5 rounded-xl border transition-all cursor-pointer"
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
                           <span>Gerar Link de Veículo Pronto p/ Cliente</span>
                         </button>
                       ) : (
                         <button
                           type="button"
                           onClick={() => handleOpenEditItensModal(os)}
-                          className="w-full flex items-center justify-center gap-1.5 bg-[#122030] hover:bg-[#16293d] text-white text-xs font-bold py-2.5 px-3 rounded-xl border border-[#1e344d] transition-all cursor-pointer"
+                          className="w-full min-h-[46px] flex items-center justify-center gap-2 bg-[#122030] hover:bg-[#16293d] text-white text-xs font-bold py-3 px-3.5 rounded-xl border border-[#1e344d] transition-all cursor-pointer"
                         >
-                          <Plus className="w-3.5 h-3.5" style={{ color: brandColor }} />
+                          <Plus className="w-4 h-4 flex-shrink-0" style={{ color: brandColor }} />
                           <span>
                             {os.status === 'APROVADO'
                               ? 'Adicionar Itens Extras e Reenviar p/ Aprovação'
@@ -937,13 +951,13 @@ export default function DashboardPage() {
                         </button>
                       )}
 
-                      {/* Ações Mobile */}
-                      <div className="grid grid-cols-2 gap-2">
+                      {/* Ações Mobile com Touch Target >= 46px */}
+                      <div className="grid grid-cols-2 gap-2.5">
                         <Link
                           href={`/os/${os.id}`}
-                          className="flex items-center justify-center gap-1.5 bg-[#0b121b] hover:bg-[#16293d] text-white text-xs font-bold py-2.5 px-3 rounded-xl border border-[#1c2e42] transition-all text-center"
+                          className="min-h-[46px] flex items-center justify-center gap-1.5 bg-[#0b121b] hover:bg-[#16293d] text-white text-xs font-bold py-3 px-3 rounded-xl border border-[#1c2e42] transition-all text-center"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" style={{ color: brandColor }} />
+                          <ExternalLink className="w-4 h-4 flex-shrink-0" style={{ color: brandColor }} />
                           <span>Link do Cliente</span>
                         </Link>
 
@@ -952,9 +966,9 @@ export default function DashboardPage() {
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{ backgroundColor: brandColor }}
-                          className="flex items-center justify-center gap-1.5 hover:opacity-90 text-slate-950 text-xs font-bold py-2.5 px-3 rounded-xl shadow-md transition-all text-center"
+                          className="min-h-[46px] flex items-center justify-center gap-1.5 hover:opacity-90 text-slate-950 text-xs font-extrabold py-3 px-3 rounded-xl shadow-md transition-all text-center"
                         >
-                          <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                          <MessageCircle className="w-4 h-4 fill-current flex-shrink-0" />
                           <span>{os.status === 'FINALIZADO' ? 'Avisar Pronto' : 'WhatsApp'}</span>
                         </a>
                       </div>
@@ -1244,62 +1258,64 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Novo Item Manual */}
-            <div className="bg-[#080d14] border border-[#1c2e42] p-3 rounded-2xl space-y-2.5">
-              <div className="grid grid-cols-2 gap-1.5 bg-[#0e1724] p-1 rounded-xl border border-[#1c2e42]">
+            {/* Novo Item Manual Mobile-First */}
+            <div className="bg-[#080d14] border border-[#1c2e42] p-3.5 rounded-2xl space-y-3">
+              <div className="grid grid-cols-2 gap-1.5 bg-[#0e1724] p-1.5 rounded-xl border border-[#1c2e42]">
                 <button
                   type="button"
                   onClick={() => setNovoItemTipo('PECA')}
                   style={novoItemTipo === 'PECA' ? { backgroundColor: brandColor } : undefined}
-                  className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`min-h-[44px] flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     novoItemTipo === 'PECA' ? 'text-slate-950' : 'text-[#8b9eb0] hover:text-white'
                   }`}
                 >
-                  <Package className="w-3.5 h-3.5" />
+                  <Package className="w-4 h-4" />
                   <span>Peça</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setNovoItemTipo('MAO_DE_OBRA')}
                   style={novoItemTipo === 'MAO_DE_OBRA' ? { backgroundColor: brandColor } : undefined}
-                  className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`min-h-[44px] flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     novoItemTipo === 'MAO_DE_OBRA' ? 'text-slate-950' : 'text-[#8b9eb0] hover:text-white'
                   }`}
                 >
-                  <Wrench className="w-3.5 h-3.5" />
+                  <Wrench className="w-4 h-4" />
                   <span>Serviço Técnico</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <input
                   type="text"
                   placeholder="Descrição da peça ou serviço técnico..."
                   value={novoItemDesc}
                   onChange={(e) => setNovoItemDesc(e.target.value)}
-                  className="col-span-2 bg-[#0e1724] border border-[#1c2e42] text-xs text-white rounded-xl px-3 py-2 focus:outline-none"
+                  className="sm:col-span-2 min-h-[48px] bg-[#0e1724] border border-[#1c2e42] text-base sm:text-xs text-white rounded-xl px-3.5 py-2.5 focus:outline-none"
                 />
                 <input
                   type="number"
+                  inputMode="decimal"
+                  step="0.01"
                   placeholder="R$ Valor"
                   value={novoItemValor}
                   onChange={(e) => setNovoItemValor(e.target.value)}
-                  className="bg-[#0e1724] border border-[#1c2e42] text-xs font-mono font-bold text-white rounded-xl px-3 py-2 focus:outline-none"
+                  className="min-h-[48px] bg-[#0e1724] border border-[#1c2e42] text-base sm:text-xs font-mono font-bold text-white rounded-xl px-3.5 py-2.5 focus:outline-none"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={handleAddNovoItemModal}
-                className="w-full bg-[#122030] hover:bg-[#192b40] text-white font-bold text-xs py-2 rounded-xl border border-[#1e344d] flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full min-h-[48px] bg-[#122030] hover:bg-[#192b40] text-white font-extrabold text-xs sm:text-sm py-3 px-4 rounded-xl border border-[#1e344d] flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" style={{ color: brandColor }} />
+                <Plus className="w-4 h-4" style={{ color: brandColor }} />
                 <span>Incluir Item na Ordem de Serviço</span>
               </button>
             </div>
 
-            {/* Lista de Itens Atuais da OS */}
-            <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+            {/* Lista de Itens Atuais da OS (Cards Responsivos sem quebra horizontal) */}
+            <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
               {isLoadingItens ? (
                 <div className="py-6 text-center text-xs text-[#8b9eb0]">
                   Carregando itens da OS...
@@ -1312,31 +1328,34 @@ export default function DashboardPage() {
                 editingItens.map((it, idx) => (
                   <div
                     key={idx}
-                    className="bg-[#080d14] border border-[#1c2e42] p-2.5 rounded-xl flex items-center justify-between text-xs"
+                    className="bg-[#080d14] border border-[#1c2e42] p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                   >
-                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <div className="flex items-start sm:items-center gap-2 min-w-0">
                       <span
                         style={{
                           backgroundColor: `${brandColor}18`,
                           color: brandColor,
                           borderColor: `${brandColor}35`,
                         }}
-                        className="text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0"
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-md border flex-shrink-0 mt-0.5 sm:mt-0"
                       >
                         {it.tipo === 'PECA' ? 'Peça' : 'Serviço Técnico'}
                       </span>
-                      <span className="text-slate-200 truncate">{it.descricao}</span>
+                      <span className="text-slate-100 font-medium break-words leading-snug">
+                        {it.descricao}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0 font-mono">
-                      <span className="font-bold text-white">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#142232] flex-shrink-0 font-mono">
+                      <span className="font-extrabold text-sm text-white">
                         R$ {Number(it.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleRemoveItemModal(idx)}
-                        className="text-rose-400 hover:text-rose-300 p-1 rounded-lg cursor-pointer"
+                        aria-label={`Remover ${it.descricao}`}
+                        className="min-w-[40px] min-h-[40px] flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-xl border border-rose-500/20 cursor-pointer"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -1344,29 +1363,43 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Novo Total Calculado */}
-            <div className="bg-[#091018] rounded-xl p-3 border border-[#1c2e42] flex items-center justify-between">
-              <span className="text-xs uppercase font-extrabold text-[#8b9eb0]">
-                Novo Valor Total Atualizado
-              </span>
-              <span style={{ color: brandColor }} className="text-xl font-black font-mono">
-                R$ {totalModalItens.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
+            {/* Novo Total Calculado com Subtotais */}
+            <div className="bg-[#091018] rounded-2xl p-3.5 border border-[#1c2e42] space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#8b9eb0]">
+                <span>Subtotal Peças e Insumos:</span>
+                <span className="font-mono font-bold text-slate-200">
+                  R$ {subtotalModalPecas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-[#8b9eb0]">
+                <span>Subtotal Serviços Técnicos:</span>
+                <span className="font-mono font-bold text-slate-200">
+                  R$ {subtotalModalServicos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-[#182738] flex items-center justify-between">
+                <span className="text-xs uppercase font-extrabold text-[#8b9eb0]">
+                  Novo Valor Total Atualizado
+                </span>
+                <span style={{ color: brandColor }} className="text-xl font-black font-mono">
+                  R$ {totalModalItens.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
             </div>
 
-            {/* Botões de Ação */}
-            <div className="space-y-2 pt-1">
+            {/* Botões de Ação com Touch Target >= 48px */}
+            <div className="space-y-2.5 pt-1">
               <button
                 type="button"
                 disabled={isSavingItens || editingItens.length === 0}
                 onClick={() => handleSalvarEReenviarOS(true)}
                 style={{ backgroundColor: brandColor }}
-                className="w-full flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 text-slate-950 font-black text-xs uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-lg cursor-pointer"
+                className="w-full min-h-[52px] flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-lg cursor-pointer"
               >
                 {isSavingItens ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  <MessageCircle className="w-4 h-4 fill-current" />
+                  <MessageCircle className="w-5 h-5 fill-current" />
                 )}
                 <span>Salvar Adicionais e Reenviar p/ Aprovação no WhatsApp</span>
               </button>
@@ -1375,7 +1408,7 @@ export default function DashboardPage() {
                 type="button"
                 disabled={isSavingItens || editingItens.length === 0}
                 onClick={() => handleSalvarEReenviarOS(false)}
-                className="w-full bg-[#122030] hover:bg-[#192b40] text-slate-200 font-bold text-xs py-2.5 rounded-xl border border-[#1e344d] cursor-pointer"
+                className="w-full min-h-[46px] bg-[#122030] hover:bg-[#192b40] text-slate-200 font-bold text-xs py-3 rounded-xl border border-[#1e344d] cursor-pointer"
               >
                 Apenas Salvar Alterações (Reabrir p/ Aprovação)
               </button>

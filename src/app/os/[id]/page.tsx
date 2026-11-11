@@ -451,7 +451,7 @@ function OSClienteContent() {
             </span>
           </div>
           <p className="text-[10px] text-[#5c7287] border-t border-[#182738] pt-2 leading-relaxed">
-            🔒 <strong className="text-slate-400">Proteção de Dados (LGPD — Lei nº 13.709/2018):</strong> Os dados deste veículo, fotos de check-in e contato são utilizados exclusivamente pela oficina responsável para execução do serviço, emissão de garantia e avisos de revisão preventiva. Tecnologia fornecida por <strong className="text-slate-300">JS OrçaFácil (JoeSevero Tech)</strong>.
+            🔒 <strong className="text-slate-400">Proteção de Dados (LGPD — Lei nº 13.709/2018):</strong> Os dados deste veículo, fotos de check-in e contato são utilizados exclusivamente pela oficina responsável para execução do serviço, emissão de garantia e avisos de revisão preventiva. Tecnologia fornecida por <strong className="text-slate-300">JS OrçaFácil (Jonatan Severo Tech)</strong>.
           </p>
         </div>
       </main>

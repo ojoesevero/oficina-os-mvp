@@ -37,10 +37,57 @@ assert.equal(formatWhatsAppNumber('5511991234567'), '5511991234567');
 assert.equal(formatWhatsAppNumber(''), '');
 console.log('✅ 2. formatWhatsAppNumber: Normalização de DDI 55 e caracteres especiais validada.');
 
-// 3. Teste de Geração de Link de Orçamento para Cliente
-function generateWhatsAppLinkParaCliente(os, oficinaNome, publicUrl) {
+// 3. Teste de Geração de Link de Orçamento para Cliente (Com Totalização de Peças e Serviços Técnicos)
+function formatMoedaWhatsApp(valor) {
+  return Number(valor || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function generateWhatsAppLinkParaCliente(os, oficinaNome, publicUrl, isReenvioAdicional = false) {
   const phone = formatWhatsAppNumber(os.cliente_whatsapp);
-  const texto = `Olá *${os.cliente_nome}*! 👋\n\nAqui é da oficina *${oficinaNome}*.\n\nSeu orçamento para o *${os.veiculo_modelo}* (Placa: *${os.veiculo_placa}*) está pronto com fotos e itens detalhados!\n\n📋 *Código*: ${os.codigo_curto}\n🔗 *Acesse e aprove online*: ${publicUrl}\n\nQualquer dúvida, estamos à disposição!`;
+  const itensOS = os.itens || [];
+  const totalPecas = itensOS
+    .filter((it) => it.tipo === 'PECA')
+    .reduce((acc, it) => acc + Number(it.valor || 0), 0);
+  const totalServicos = itensOS
+    .filter((it) => it.tipo === 'MAO_DE_OBRA')
+    .reduce((acc, it) => acc + Number(it.valor || 0), 0);
+  const somaItens = totalPecas + totalServicos;
+  const valorTotalFinal = somaItens > 0 ? somaItens : Number(os.valor_total || 0);
+
+  const linhasItens =
+    itensOS.length > 0
+      ? [
+          '',
+          '*ITENS DO ORÇAMENTO:*',
+          ...itensOS.map(
+            (it) =>
+              `• ${it.descricao} _(${it.tipo === 'PECA' ? 'Peça' : 'Serviço Técnico'})_: *R$ ${formatMoedaWhatsApp(it.valor)}*`
+          ),
+        ].join('\n')
+      : '';
+
+  const blocoTotais = [
+    '',
+    '*RESUMO DE VALORES:*',
+    ...(itensOS.length > 0
+      ? [
+          `📦 *Peças e Insumos*: R$ ${formatMoedaWhatsApp(totalPecas)}`,
+          `🔧 *Serviços Técnicos*: R$ ${formatMoedaWhatsApp(totalServicos)}`,
+        ]
+      : []),
+    `💰 *VALOR TOTAL*: *R$ ${formatMoedaWhatsApp(valorTotalFinal)}*`,
+  ].join('\n');
+
+  const cabecalho = isReenvioAdicional
+    ? `Olá *${os.cliente_nome}*! 🔧\n\nAqui é da oficina *${oficinaNome}*.\nAtualizamos o orçamento do seu *${os.veiculo_modelo}* (Placa: *${os.veiculo_placa}*) com novos itens identificados na avaliação técnica.`
+    : `Olá *${os.cliente_nome}*! 👋\n\nAqui é da oficina *${oficinaNome}*.\nO orçamento do seu *${os.veiculo_modelo}* (Placa: *${os.veiculo_placa}*) já está pronto para sua análise!`;
+
+  const rodape = `\n📋 *Ordem de Serviço*: #${os.codigo_curto}\n🔗 *Veja as fotos e aprove online com 1 clique*:\n${publicUrl}\n\nQualquer dúvida, estamos à disposição!`;
+  const texto = `${cabecalho}\n${linhasItens}\n${blocoTotais}\n${rodape}`;
+
   return `https://wa.me/${phone}?text=${encodeURIComponent(texto)}`;
 }
 
@@ -51,6 +98,10 @@ const mockOS = {
   cliente_whatsapp: '(11) 99123-4567',
   veiculo_placa: 'BRA2E19',
   veiculo_modelo: 'Honda Civic',
+  itens: [
+    { tipo: 'PECA', descricao: 'Óleo Motor 5W30', valor: 280 },
+    { tipo: 'MAO_DE_OBRA', descricao: 'Serviço Técnico: Revisão', valor: 150 },
+  ],
 };
 
 const linkCliente = generateWhatsAppLinkParaCliente(mockOS, 'AutoCenter Líder', 'https://meuapp.com/os/a1b2c3d4-0001-4000-8000-000000000001');
@@ -58,8 +109,11 @@ assert.ok(linkCliente.startsWith('https://wa.me/5511991234567?text='));
 assert.ok(linkCliente.includes(encodeURIComponent('Carlos Ferreira')));
 assert.ok(linkCliente.includes(encodeURIComponent('OS-8491')));
 assert.ok(linkCliente.includes(encodeURIComponent('BRA2E19')));
+assert.ok(linkCliente.includes(encodeURIComponent('Peças e Insumos*: R$ 280,00')));
+assert.ok(linkCliente.includes(encodeURIComponent('Serviços Técnicos*: R$ 150,00')));
+assert.ok(linkCliente.includes(encodeURIComponent('VALOR TOTAL*: *R$ 430,00*')));
 assert.ok(linkCliente.includes(encodeURIComponent('https://meuapp.com/os/a1b2c3d4-0001-4000-8000-000000000001')));
-console.log('✅ 3. generateWhatsAppLinkParaCliente: Link e mensagem com encoding e dados corretos.');
+console.log('✅ 3. generateWhatsAppLinkParaCliente: Link wa.me com quebras de linha e totalização de Peças, Serviços Técnicos e Total validado.');
 
 // 4. Teste de Geração de Link de Revisão Preventiva (6 Meses)
 function generateWhatsAppRevisaoLink(os, oficinaNome) {

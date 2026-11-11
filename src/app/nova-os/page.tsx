@@ -95,8 +95,14 @@ export default function NovaOSPage() {
       ? currentOficina.servicos_rapidos
       : SUGESTOES_RAPIDAS;
 
-  // Calcular valor total dinâmico
-  const valorTotal = itens.reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
+  // Calcular subtotais (Peças vs Serviços Técnicos) e valor total dinâmico
+  const subtotalPecas = itens
+    .filter((item) => item.tipo === 'PECA')
+    .reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
+  const subtotalServicos = itens
+    .filter((item) => item.tipo === 'MAO_DE_OBRA')
+    .reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
+  const valorTotal = subtotalPecas + subtotalServicos;
 
   // Upload de fotos
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -204,6 +210,12 @@ export default function NovaOSPage() {
       const cleanPhone = unmaskPhone(clienteWhatsapp);
       const cleanKM = unmaskKM(kmAtual);
 
+      const itensNormalizados = itens.map((it) => ({
+        tipo: it.tipo,
+        descricao: it.descricao,
+        valor: Number(it.valor),
+      }));
+
       const result = await createOrdemServico({
         oficina_id: currentOficina.id,
         cliente_nome: clienteNome,
@@ -212,11 +224,7 @@ export default function NovaOSPage() {
         veiculo_modelo: veiculoModelo,
         km_atual: cleanKM,
         fotos_entrada: fotos,
-        itens: itens.map((it) => ({
-          tipo: it.tipo,
-          descricao: it.descricao,
-          valor: Number(it.valor),
-        })),
+        itens: itensNormalizados,
       });
 
       const publicUrl = `${window.location.origin}/os/${result.id}`;
@@ -228,6 +236,8 @@ export default function NovaOSPage() {
           veiculo_placa: cleanPlaca,
           codigo_curto: result.codigo_curto,
           id: result.id,
+          valor_total: valorTotal,
+          itens: itensNormalizados,
         },
         currentOficina.nome,
         publicUrl
@@ -264,11 +274,11 @@ export default function NovaOSPage() {
       
       {/* Top Header com Botão de Voltar e Logo PitTrack */}
       <header className="sticky top-0 z-30 bg-[#080d14]/95 backdrop-blur-md border-b border-[#1c2e42] px-4 py-3">
-        <div className="max-w-md mx-auto flex items-center justify-between">
+        <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => router.push('/')}
-            className="flex items-center gap-1.5 text-[#8b9eb0] hover:text-white bg-[#0e1724] hover:bg-[#152336] active:scale-95 text-xs font-bold py-1.5 px-3 rounded-xl border border-[#1c2e42] transition-all cursor-pointer"
+            className="flex items-center gap-2 text-[#8b9eb0] hover:text-white bg-[#0e1724] hover:bg-[#152336] active:scale-95 text-xs font-bold min-h-[44px] py-2.5 px-3.5 rounded-xl border border-[#1c2e42] transition-all cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
             <span>Voltar ao Pátio</span>
@@ -285,9 +295,9 @@ export default function NovaOSPage() {
       </header>
 
       {/* Main Form Container */}
-      <main className="max-w-md mx-auto w-full px-4 pt-4 flex-1">
+      <main className="max-w-lg mx-auto w-full px-4 pt-4 flex-1">
         {errorMsg && (
-          <div className="mb-4 bg-rose-500/10 border border-rose-500/40 text-rose-300 px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-2">
+          <div className="mb-4 bg-rose-500/10 border border-rose-500/40 text-rose-300 px-3.5 py-3 rounded-xl text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
             <span>{errorMsg}</span>
           </div>
@@ -298,7 +308,7 @@ export default function NovaOSPage() {
           {/* Identificação da Oficina Autenticada */}
           <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold flex-shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold flex-shrink-0">
                 <Building2 className="w-4 h-4" />
               </div>
               <div className="min-w-0">
@@ -310,24 +320,24 @@ export default function NovaOSPage() {
                 </span>
               </div>
             </div>
-            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold px-2 py-0.5 rounded-lg flex-shrink-0">
+            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold px-2.5 py-1 rounded-lg flex-shrink-0">
               Ativa
             </span>
           </div>
 
           {/* Dados do Veículo */}
-          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center gap-2 border-b border-[#182738] pb-2">
+          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-sm space-y-3.5">
+            <div className="flex items-center gap-2 border-b border-[#182738] pb-2.5">
               <Car className="w-4 h-4 text-emerald-400" />
               <span className="text-xs font-black uppercase tracking-wider text-white">
                 Dados do Veículo
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Placa Mercosul com Máscara Automática */}
               <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1">
+                <label className="text-[11px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1.5">
                   Placa (Mercosul / Antiga) *
                 </label>
                 <input
@@ -337,13 +347,13 @@ export default function NovaOSPage() {
                   value={veiculoPlaca}
                   onChange={(e) => setVeiculoPlaca(maskPlaca(e.target.value))}
                   required
-                  className="w-full bg-[#080d14] border border-[#1c2e42] uppercase font-mono font-bold text-sm text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 tracking-wider placeholder:normal-case placeholder:font-normal placeholder:text-[#5c7287]"
+                  className="w-full min-h-[48px] bg-[#080d14] border border-[#1c2e42] uppercase font-mono font-bold text-base sm:text-sm text-white rounded-xl px-3.5 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 tracking-wider placeholder:normal-case placeholder:font-normal placeholder:text-[#5c7287]"
                 />
               </div>
 
               {/* KM Atual com Máscara Automática */}
               <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1">
+                <label className="text-[11px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1.5">
                   KM Atual
                 </label>
                 <input
@@ -352,14 +362,14 @@ export default function NovaOSPage() {
                   placeholder="Ex: 48.500"
                   value={kmAtual}
                   onChange={(e) => setKmAtual(maskKM(e.target.value))}
-                  className="w-full bg-[#080d14] border border-[#1c2e42] font-mono text-sm text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-[#5c7287]"
+                  className="w-full min-h-[48px] bg-[#080d14] border border-[#1c2e42] font-mono text-base sm:text-sm text-white rounded-xl px-3.5 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-[#5c7287]"
                 />
               </div>
             </div>
 
             {/* Modelo do Veículo */}
             <div>
-              <label className="text-[10px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1">
+              <label className="text-[11px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1.5">
                 Modelo e Versão *
               </label>
               <input
@@ -368,23 +378,23 @@ export default function NovaOSPage() {
                 value={veiculoModelo}
                 onChange={(e) => setVeiculoModelo(e.target.value)}
                 required
-                className="w-full bg-[#080d14] border border-[#1c2e42] text-sm font-semibold text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-[#5c7287]"
+                className="w-full min-h-[48px] bg-[#080d14] border border-[#1c2e42] text-base sm:text-sm font-semibold text-white rounded-xl px-3.5 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-[#5c7287]"
               />
             </div>
           </div>
 
           {/* Dados do Cliente */}
-          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center gap-2 border-b border-[#182738] pb-2">
+          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-sm space-y-3.5">
+            <div className="flex items-center gap-2 border-b border-[#182738] pb-2.5">
               <User className="w-4 h-4 text-emerald-400" />
               <span className="text-xs font-black uppercase tracking-wider text-white">
                 Dados do Cliente (WhatsApp)
               </span>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1">
+                <label className="text-[11px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1.5">
                   Nome Completo *
                 </label>
                 <input
@@ -393,16 +403,16 @@ export default function NovaOSPage() {
                   value={clienteNome}
                   onChange={(e) => setClienteNome(e.target.value)}
                   required
-                  className="w-full bg-[#080d14] border border-[#1c2e42] text-sm font-semibold text-white rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-[#5c7287]"
+                  className="w-full min-h-[48px] bg-[#080d14] border border-[#1c2e42] text-base sm:text-sm font-semibold text-white rounded-xl px-3.5 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-[#5c7287]"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1">
+                <label className="text-[11px] uppercase font-bold tracking-wider text-[#8b9eb0] block mb-1.5">
                   WhatsApp com DDD (com máscara automática) *
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#5c7287]">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#5c7287]">
                     BR
                   </span>
                   <input
@@ -413,7 +423,7 @@ export default function NovaOSPage() {
                     value={clienteWhatsapp}
                     onChange={(e) => setClienteWhatsapp(maskPhone(e.target.value))}
                     required
-                    className="w-full bg-[#080d14] border border-[#1c2e42] text-sm font-mono font-semibold text-white rounded-xl pl-11 pr-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-[#5c7287]"
+                    className="w-full min-h-[48px] bg-[#080d14] border border-[#1c2e42] text-base sm:text-sm font-mono font-semibold text-white rounded-xl pl-11 pr-3.5 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-[#5c7287]"
                   />
                 </div>
               </div>
@@ -421,20 +431,20 @@ export default function NovaOSPage() {
           </div>
 
           {/* Upload de Fotos de Entrada */}
-          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-[#182738] pb-2">
+          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-sm space-y-3.5">
+            <div className="flex items-center justify-between border-b border-[#182738] pb-2.5 gap-2">
               <span className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1.5">
-                <Camera className="w-4 h-4 text-emerald-400" />
+                <Camera className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                 <span>Fotos de Check-in na Oficina</span>
               </span>
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md flex-shrink-0">
                 WebP Otimizado p/ 4G
               </span>
             </div>
 
             {/* Grid de Fotos */}
             {fotos.length > 0 && (
-              <div className="grid grid-cols-3 gap-2 pt-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
                 {fotos.map((url, idx) => (
                   <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-[#1c2e42] bg-[#080d14] group">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -442,16 +452,17 @@ export default function NovaOSPage() {
                     <button
                       type="button"
                       onClick={() => handleRemovePhoto(idx)}
-                      className="absolute top-1 right-1 bg-rose-600/90 hover:bg-rose-500 text-white p-1 rounded-full shadow-lg"
+                      aria-label={`Remover foto ${idx + 1}`}
+                      className="absolute top-1.5 right-1.5 bg-rose-600/95 hover:bg-rose-500 text-white min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full shadow-lg cursor-pointer"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Botão de Upload */}
+            {/* Botão de Upload com Área de Toque Ampliada */}
             <input
               ref={fileInputRef}
               type="file"
@@ -466,16 +477,16 @@ export default function NovaOSPage() {
               type="button"
               disabled={isUploadingPhoto}
               onClick={() => fileInputRef.current?.click()}
-              className="w-full border-2 border-dashed border-[#1c2e42] hover:border-emerald-500/60 bg-[#080d14] hover:bg-[#0c1521] transition-all rounded-xl py-3 px-4 flex items-center justify-center gap-2 text-xs font-bold text-slate-300 active:scale-98 cursor-pointer"
+              className="w-full min-h-[52px] border-2 border-dashed border-[#1c2e42] hover:border-emerald-500/60 bg-[#080d14] hover:bg-[#0c1521] transition-all rounded-xl py-3.5 px-4 flex items-center justify-center gap-2.5 text-xs sm:text-sm font-bold text-slate-200 active:scale-98 cursor-pointer"
             >
               {isUploadingPhoto ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                  <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
                   <span>Comprimindo em WebP e enviando...</span>
                 </>
               ) : (
                 <>
-                  <Camera className="w-4 h-4 text-emerald-400" />
+                  <Camera className="w-5 h-5 text-emerald-400" />
                   <span>Tirar Foto ou Carregar da Galeria</span>
                 </>
               )}
@@ -483,150 +494,172 @@ export default function NovaOSPage() {
           </div>
 
           {/* Adição Dinâmica de Itens (Services e Parts) */}
-          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-[#182738] pb-2">
+          <div className="bg-[#0e1724] border border-[#1c2e42] rounded-2xl p-4 shadow-sm space-y-3.5">
+            <div className="flex items-center justify-between border-b border-[#182738] pb-2.5">
               <span className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1.5">
                 <Wrench className="w-4 h-4 text-emerald-400" />
-                <span>Peças & Serviços</span>
+                <span>Peças & Serviços Técnicos</span>
               </span>
               <span className="text-xs font-extrabold text-emerald-400 font-mono">
                 {itens.length} {itens.length === 1 ? 'item' : 'itens'}
               </span>
             </div>
 
-            {/* Sugestões Rápidas do Catálogo da Oficina */}
+            {/* Sugestões Rápidas do Catálogo da Oficina (Touch-Friendly Pills) */}
             <div>
-              <span className="text-[10px] uppercase font-bold text-[#5c7287] mb-1.5 block">
-                Catálogo Rápido da Oficina:
+              <span className="text-[11px] uppercase font-bold text-[#8b9eb0] mb-2 block">
+                Catálogo Rápido da Oficina (Toque p/ Adicionar):
               </span>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {catalogoOficina.map((sug, i) => (
                   <button
                     key={i}
                     type="button"
                     onClick={() => handleAddSugestao(sug)}
-                    className="text-[10px] bg-[#080d14] border border-[#1c2e42] hover:border-emerald-500/50 text-[#8b9eb0] hover:text-white px-2 py-1 rounded-lg flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
+                    className="min-h-[40px] text-xs bg-[#080d14] border border-[#1c2e42] hover:border-emerald-500/50 text-slate-200 hover:text-white px-3 py-2 rounded-xl flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer text-left"
                   >
-                    <Plus className="w-3 h-3 flex-shrink-0" style={{ color: brandColor }} />
-                    <span>{sug.descricao}</span>
-                    <span className="font-bold font-mono" style={{ color: brandColor }}>R${sug.valor}</span>
+                    <Plus className="w-3.5 h-3.5 flex-shrink-0" style={{ color: brandColor }} />
+                    <span className="line-clamp-1">{sug.descricao}</span>
+                    <span className="font-bold font-mono flex-shrink-0" style={{ color: brandColor }}>
+                      R${sug.valor}
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Formulário de Adição de Item */}
-            <div className="bg-[#080d14] border border-[#1c2e42] p-3 rounded-xl space-y-2.5">
-              <div className="grid grid-cols-2 gap-1.5 bg-[#0e1724] p-1 rounded-xl border border-[#1c2e42]">
+            {/* Formulário de Adição de Item Mobile-First */}
+            <div className="bg-[#080d14] border border-[#1c2e42] p-3.5 rounded-2xl space-y-3">
+              <div className="grid grid-cols-2 gap-1.5 bg-[#0e1724] p-1.5 rounded-xl border border-[#1c2e42]">
                 <button
                   type="button"
                   onClick={() => setNovoTipo('PECA')}
                   style={novoTipo === 'PECA' ? { backgroundColor: brandColor } : undefined}
-                  className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     novoTipo === 'PECA'
                       ? 'text-slate-950 shadow-sm'
                       : 'text-[#8b9eb0] hover:text-white'
                   }`}
                 >
-                  <Package className="w-3.5 h-3.5" />
+                  <Package className="w-4 h-4" />
                   <span>Peça</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setNovoTipo('MAO_DE_OBRA')}
                   style={novoTipo === 'MAO_DE_OBRA' ? { backgroundColor: brandColor } : undefined}
-                  className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     novoTipo === 'MAO_DE_OBRA'
                       ? 'text-slate-950 shadow-sm'
                       : 'text-[#8b9eb0] hover:text-white'
                   }`}
                 >
-                  <Wrench className="w-3.5 h-3.5" />
+                  <Wrench className="w-4 h-4" />
                   <span>Serviço Técnico</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              {/* Empilhado no celular (< sm) e lado a lado em telas maiores (sm:grid-cols-3) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <input
                   type="text"
-                  placeholder="Descrição do item..."
+                  placeholder="Descrição da peça ou serviço..."
                   value={novaDescricao}
                   onChange={(e) => setNovaDescricao(e.target.value)}
-                  className="col-span-2 bg-[#0e1724] border border-[#1c2e42] text-xs text-white rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500 placeholder:text-[#5c7287]"
+                  className="sm:col-span-2 min-h-[48px] bg-[#0e1724] border border-[#1c2e42] text-base sm:text-xs text-white rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-emerald-500 placeholder:text-[#5c7287]"
                 />
                 <input
                   type="number"
-                  placeholder="R$ Valor"
+                  inputMode="decimal"
+                  step="0.01"
+                  placeholder="R$ Valor (ex: 150)"
                   value={novoValor}
                   onChange={(e) => setNovoValor(e.target.value)}
-                  className="bg-[#0e1724] border border-[#1c2e42] text-xs font-mono font-bold text-white rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500 placeholder:text-[#5c7287]"
+                  className="min-h-[48px] bg-[#0e1724] border border-[#1c2e42] text-base sm:text-xs font-mono font-bold text-white rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-emerald-500 placeholder:text-[#5c7287]"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={() => handleAddItem()}
-                className="w-full bg-[#122030] hover:bg-[#16273b] text-emerald-400 font-bold text-xs py-2 rounded-xl border border-[#1e344d] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full min-h-[48px] bg-[#122030] hover:bg-[#16273b] active:scale-98 text-emerald-400 font-extrabold text-xs sm:text-sm py-3 px-4 rounded-xl border border-[#1e344d] transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span>Adicionar ao Orçamento</span>
+                <Plus className="w-4 h-4 stroke-[3]" />
+                <span>Adicionar Peça / Serviço ao Orçamento</span>
               </button>
             </div>
 
-            {/* Lista dos Itens Já Adicionados */}
-            <div className="space-y-1.5 pt-1">
+            {/* Lista Empilhada de Cards de Itens (Sem quebra horizontal no celular) */}
+            <div className="space-y-2 pt-1">
               {itens.map((it, idx) => (
                 <div
                   key={idx}
-                  className="bg-[#080d14] border border-[#1c2e42] p-2.5 rounded-xl flex items-center justify-between text-xs"
+                  className="bg-[#080d14] border border-[#1c2e42] p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                 >
-                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                  <div className="flex items-start sm:items-center gap-2 min-w-0">
                     <span
                       style={{
                         backgroundColor: `${brandColor}18`,
                         color: brandColor,
                         borderColor: `${brandColor}35`,
                       }}
-                      className="text-[10px] font-bold px-1.5 py-0.2 rounded border flex-shrink-0"
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-md border flex-shrink-0 mt-0.5 sm:mt-0"
                     >
                       {it.tipo === 'PECA' ? 'Peça' : 'Serviço Técnico'}
                     </span>
-                    <span className="text-slate-200 truncate">{it.descricao}</span>
+                    <span className="text-slate-100 font-medium break-words leading-snug">
+                      {it.descricao}
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-shrink-0 font-mono">
-                    <span className="font-bold text-white">
+                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#142232] flex-shrink-0 font-mono">
+                    <span className="font-extrabold text-sm text-white">
                       R$ {Number(it.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(idx)}
-                      className="text-rose-400/80 hover:text-rose-300 p-1 rounded-lg"
+                      aria-label={`Remover ${it.descricao}`}
+                      className="min-w-[40px] min-h-[40px] flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-xl border border-rose-500/20 transition-colors cursor-pointer"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Totalizador com a Cor da Oficina */}
-            <div className="bg-[#091018] rounded-xl p-3 border border-[#1c2e42] flex items-center justify-between">
-              <span className="text-xs uppercase font-extrabold text-[#8b9eb0] tracking-wider">
-                Valor Total Estimado
-              </span>
-              <span style={{ color: brandColor }} className="text-xl font-black font-mono">
-                R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
+            {/* Resumo de Subtotais (Peças vs Serviços Técnicos) + Totalizador */}
+            <div className="bg-[#091018] rounded-2xl p-3.5 border border-[#1c2e42] space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#8b9eb0]">
+                <span>Subtotal Peças e Insumos:</span>
+                <span className="font-mono font-bold text-slate-200">
+                  R$ {subtotalPecas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-[#8b9eb0]">
+                <span>Subtotal Serviços Técnicos:</span>
+                <span className="font-mono font-bold text-slate-200">
+                  R$ {subtotalServicos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-[#182738] flex items-center justify-between">
+                <span className="text-xs uppercase font-extrabold text-[#8b9eb0] tracking-wider">
+                  Valor Total Estimado
+                </span>
+                <span style={{ color: brandColor }} className="text-xl font-black font-mono">
+                  R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Botão de Envio (Com a Cor Padrão da Oficina) */}
+          {/* Botão Principal de Ação (Touch Target >= 56px) */}
           <button
             type="submit"
             disabled={isSubmitting}
             style={{ backgroundColor: brandColor }}
-            className="w-full flex items-center justify-center gap-2 hover:opacity-90 active:scale-98 disabled:opacity-50 text-slate-950 font-black text-sm py-4 px-4 rounded-2xl shadow-xl transition-all uppercase tracking-wide cursor-pointer"
+            className="w-full min-h-[56px] flex items-center justify-center gap-2.5 hover:opacity-90 active:scale-98 disabled:opacity-50 text-slate-950 font-black text-sm sm:text-base py-4 px-5 rounded-2xl shadow-xl transition-all uppercase tracking-wide cursor-pointer"
           >
             {isSubmitting ? (
               <>

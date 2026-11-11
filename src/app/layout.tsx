@@ -9,8 +9,11 @@ const jakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "JS OrçaFácil | Gestão Ágil para Oficinas Mecânicas",
-  description: "Sistema profissional para oficinas mecânicas e centros automotivos: pátio em tempo real, orçamentos no WhatsApp e alertas de revisão.",
+  title: "JS OrçaFácil | Gestão Ágil para Oficinas Mecânicas — Jonatan Severo Tech",
+  description: "Sistema profissional desenvolvido por Jonatan Severo Tech para oficinas mecânicas e centros automotivos: pátio em tempo real, orçamentos no WhatsApp e alertas de revisão.",
+  authors: [{ name: "Jonatan Severo" }, { name: "Jonatan Severo Tech" }],
+  creator: "Jonatan Severo Tech",
+  publisher: "Jonatan Severo Tech",
   manifest: "/manifest.json",
   icons: {
     icon: "/favicon.ico",

@@ -1,6 +1,6 @@
-# 💼 Plano de Ação Comercial e Estratégia de Vendas — JS OrçaFácil (by JoeSevero Tech)
+# 💼 Plano de Ação Comercial e Estratégia de Vendas — JS OrçaFácil (by Jonatan Severo Tech)
 
-> **Manual de Vendas, Prospecção e Precificação — Produto: JS OrçaFácil | Fornecedor: JoeSevero Tech**  
+> **Manual de Vendas, Prospecção e Precificação — Produto: JS OrçaFácil | Fornecedor: Jonatan Severo Tech (Jonatan Severo)**  
 > *Transforme oficinas mecânicas do papel, da prancheta e das mensagens desorganizadas em negócios ágeis com orçamentos aprovados em 1 clique no WhatsApp.*
 
 ---
@@ -73,7 +73,7 @@ Dono de oficina mecânica não tem paciência para apresentações de slides em 
 ### 💬 Script 2: Abordagem via WhatsApp (Prospecção Digital Local)
 *(Localize oficinas mecânicas no Google Maps da sua cidade com boas avaliações e mande para o WhatsApp comercial):*
 
-> *"Olá, pessoal da [Nome da Oficina]! Tudo bem? Aqui é da **JoeSevero Tech**.*  
+> *"Olá, pessoal da [Nome da Oficina]! Tudo bem? Aqui é da **Jonatan Severo Tech**.*  
 > *Nós desenvolvemos o **JS OrçaFácil**, um sistema prático para oficinas mecânicas enviarem orçamentos com fotos de check-in e aprovação em 1 clique direto no WhatsApp do cliente.*  
 > *Gravei uma demonstração rápida de 45 segundos mostrando o sistema funcionando. Posso te enviar por aqui sem compromisso?"*
 

@@ -82,14 +82,14 @@ function LoginContent() {
     <div className="min-h-screen bg-[#080d14] text-slate-100 flex flex-col justify-center px-4 py-8 selection:bg-emerald-500 selection:text-slate-950">
       <div className="max-w-md w-full mx-auto space-y-6">
         
-        {/* Topo Logo e Posicionamento Unificado JoeSevero Tech + JS OrçaFácil */}
+        {/* Topo Logo e Posicionamento Unificado Jonatan Severo Tech + JS OrçaFácil */}
         <div className="flex flex-col items-center text-center space-y-2.5">
           <PitTrackLogo size="lg" />
           <p className="text-xs text-[#8b9eb0] max-w-xs mx-auto leading-relaxed">
             Sistema de gestão de pátio, check-in fotográfico e orçamentos aprovados em 1 clique no WhatsApp.
           </p>
           <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/90 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
-            Uma solução JoeSevero Tech
+            Uma solução Jonatan Severo Tech
           </span>
         </div>
 
@@ -187,7 +187,7 @@ function LoginContent() {
             <span>Isolamento Multi-Tenant e proteção de dados em conformidade com a LGPD (Lei nº 13.709/2018).</span>
           </div>
           <p className="text-[10px] text-[#5c7287]">
-            JS OrçaFácil • Desenvolvido e fornecido por <strong className="text-slate-300">JoeSevero Tech</strong>
+            JS OrçaFácil • Desenvolvido e fornecido por <strong className="text-slate-300">Jonatan Severo Tech</strong>
           </p>
         </div>
       </div>
